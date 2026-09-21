@@ -1,0 +1,21 @@
+schema: proagents/lock/v1
+specHash: sha256:9b665ffba1404d1e2a38d67c9c2567bf1918ff68206233f2d1a9f6e42540694e
+resolved:
+  browser-automation:
+    source: proagents
+    artifact: profile:accessibility-engineer
+    version: 1.1.0
+    checksum: sha256:d360b101386cc036ece6c3588bfc670652ccb480dd141129d9046a369f04a1e1
+    title: Accessibility Engineer
+  database-access:
+    source: proagents
+    artifact: profile:backend-engineer
+    version: 1.1.0
+    checksum: sha256:6a270ca1fceaf9f4471343c1f1bac50f978e3e0eec623292d5ce9f8f8c9163c2
+    title: Backend Engineer
+  source-control:
+    source: proagents
+    artifact: profile:senior-engineer
+    version: 1.1.0
+    checksum: sha256:2cab757028dfbf3e62d83abcc3632296fe89835ec087dead2be41f9f35753f26
+    title: Senior Engineer

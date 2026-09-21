@@ -7,6 +7,32 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 The repository is specification-first: until the first implementation release,
 the project stays on 0.x and everything may change.
 
+## [Unreleased]
+
+### Added
+
+- ProAgents professional environment: `proagents.yaml` (the human-authored
+  environment spec) declares the professions this project needs —
+  staff-engineer, security-engineer, technical-writer, backend-engineer,
+  devops-engineer, qa-engineer, sre, release-engineer (one per ACC expertise
+  domain in `.acc/config/agents/`) — plus the capabilities browser-automation,
+  database-access, and source-control, with workspace-only filesystem policy
+  and an explicit network allowlist mirroring the product's own restricted
+  network model.
+- `proagents.lock` (checksummed, reproducible resolution graph) from
+  `proagent resolve` → `proagent lock` → `proagent validate --spec`.
+- Equipped harness artifacts compiled for OpenCode: the composed professional
+  skill under `.agents/skills/`, the profile block in `AGENTS.md`,
+  `opencode.json` rule enforcement (force push and destructive shell commands
+  denied), and `.mcp.json` MCP servers (postgres, kubernetes, playwright,
+  github) resolved from the declared capabilities.
+
+### Fixed
+
+- Installed the `release-checklist.json` knowledge file into the composed skill
+  directory; `proagent setup` references it but does not copy it from the
+  packaged registry.
+
 ## [0.1.0] - 2026-09-21
 
 The first tagged release: the complete product specification, the distilled

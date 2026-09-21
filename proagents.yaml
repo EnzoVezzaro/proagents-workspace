@@ -1,0 +1,59 @@
+# proagents.yaml — the human-authored source of truth for this project's agent environment.
+# Declares capabilities, not implementations; the registry resolves the graph.
+# Pipeline: proagent resolve → proagent lock → proagent validate --spec → proagent setup
+schema: proagents/v1
+
+project:
+  name: proagents-workspace
+  description: >-
+    The programmable workspace for AI agents — an open-source, agent-first
+    execution environment. Spec-first repository: README.md is the canonical
+    product spec, docs/ is the distilled documentation. V1 implementation
+    (kernel, paw CLI, SDK, local + Docker runtimes, GitHub + ACC providers,
+    verification) lands per spec section 134.
+
+environment:
+  # Professions this job needs — mirrors .acc/config/agents/ (the ACC expertise map):
+  #   staff-engineer      ← architecture-reviewer (kernel purity, architectural consistency)
+  #   security-engineer  ← security-reviewer (protection before execution, honest reporting)
+  #   technical-writer   ← spec-editor + documentation-editor (spec + docs discipline)
+  #   backend-engineer   ← nodejs-engineer (TypeScript/Node/pnpm/Zod kernel, CLI, SDK)
+  #   devops-engineer    ← runtime/kubernetes/cloud-infrastructure engineers (Docker, OpenTofu, K8s, CI)
+  #   qa-engineer        ← verification-engineer (contract suites, lifecycle, CI mode)
+  #   sre                ← reliability-engineer (observability, provider health, paw doctor)
+  #   release-engineer   ← open-source-maintainer (release trains, changelog discipline, rollback-first)
+  profiles:
+    - staff-engineer
+    - security-engineer
+    - technical-writer
+    - backend-engineer
+    - devops-engineer
+    - qa-engineer
+    - sre
+    - release-engineer
+  # Capabilities the environment needs — the same tools declared in .acc/config/tools/:
+  #   browser-automation ← playwright (browser-test lifecycle steps)
+  #   database-access    ← postgres/redis workspace services
+  #   source-control     ← git (conservative defaults, guarded operations)
+  capabilities:
+    - browser-automation
+    - database-access
+    - source-control
+
+policies:
+  filesystem:
+    workspace-only: true
+  network:
+    # Mirrors the product's own restricted network model (docs/security.md):
+    # explicit, declared, never silent.
+    allowed:
+      - github.com
+      - registry.npmjs.org
+      - api.github.com
+
+harness:
+  # Mode: compatible — never a pin. Same environment, any of these adapters.
+  compatibility:
+    - opencode
+    - codex
+    - claude-code
