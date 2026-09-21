@@ -1,0 +1,45 @@
+{
+  "$comment": "Plugin manifest template — required fields per spec section 59. The kernel reads the 'proagents' key as machine-readable metadata: capabilities, dependencies, permissions, compatibility. Optional fields: documentation, examples, healthChecks, upgradePolicy, migration. Hand-edit everything except 'integrity' (publishing computes it).",
+  "name": "@proagents/plugin-{{slug}}",
+  "version": "0.1.0",
+  "description": "{{description}}",
+  "license": "MIT",
+  "type": "module",
+  "engines": { "node": ">=18" },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "lint": "eslint src test",
+    "typecheck": "tsc --noEmit"
+  },
+  "proagents": {
+    "id": "{{slug}}",
+    "name": "{{name}}",
+    "description": "{{description}}",
+    "capabilities": ["{{capability-contract-id}}"],
+    "dependencies": ["{{required-service-or-plugin-ids}}"],
+    "configuration": { "schema": "./config-schema.json" },
+    "permissions": ["network", "filesystem:/workspace/repo"],
+    "compatibility": {
+      "workspaceApi": "^1.0.0",
+      "{{capability-contract-id}}Contract": "^1.0.0"
+    },
+    "runtimeRequirements": { "node": ">=18" },
+    "integrity": { "$comment": "Publishing computes the integrity fields; never hand-edit." },
+    "healthChecks": "./dist/health.js",
+    "documentation": "./README.md",
+    "examples": "./examples/",
+    "upgradePolicy": "semver",
+    "migration": "./MIGRATION.md"
+  },
+  "dependencies": {
+    "@proagents/workspace": "^1.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0",
+    "vitest": "^3.0.0",
+    "zod": "^4.0.0"
+  }
+}

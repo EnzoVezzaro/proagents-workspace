@@ -1,0 +1,152 @@
+# proagents-workspace — ACC Control Plane Configuration
+#
+# Optional. When absent, ACC uses sensible defaults and every command
+# still works. See docs/03-repository-structure.md in the ACC repo.
+#
+# This repository is specification-first: README.md is the canonical spec,
+# docs/ is the distilled documentation. No source code yet — analyzers
+# are off, the AI engine stays opt-in (offline/deterministic by default).
+schema_version: 1
+
+# -----------------------------------------------------------------------------
+# Language Analyzers
+# -----------------------------------------------------------------------------
+# Off for now: the repository contains Markdown only. When implementation
+# code lands (packages for the kernel, providers, and the `paw` CLI),
+# enable the analyzers that match it.
+language_analyzers:
+  rust: false
+  typescript: false
+  go: false
+  python: false
+  javascript: false
+
+# -----------------------------------------------------------------------------
+# Ignore Patterns
+# -----------------------------------------------------------------------------
+# In addition to built-in defaults (.git/, node_modules/, dist/, build/).
+ignore:
+  - "node_modules/"
+  - "dist/"
+  - "build/"
+  - "coverage/"
+
+# -----------------------------------------------------------------------------
+# Diagnostic Tuning
+# -----------------------------------------------------------------------------
+# Canonical severities are fixed by the ACC0xx registry.
+diagnostics:
+  warn_only: []
+
+# -----------------------------------------------------------------------------
+# Ownership Configuration
+# -----------------------------------------------------------------------------
+ownership:
+  strict: false
+
+# -----------------------------------------------------------------------------
+# Templates
+# -----------------------------------------------------------------------------
+# The system uses templates from .acc/config/templates/ to create and
+# modify ACC files. Edit the .md files there to customize generated
+# output. Override per-command with --template <path>.
+templates:
+  agents_md: .acc/config/templates/agents.md
+  memory: .acc/config/templates/memory.md
+  # warn: .acc/config/templates/warn.md          # ACC_WARN.md template (engine-generated)
+
+# -----------------------------------------------------------------------------
+# Engine (AI-powered, token-gated)
+# -----------------------------------------------------------------------------
+# The engine keeps ACC files in sync with the codebase. The AI phase only
+# runs when the trigger fires. Enable per docs/05-cli-commands.md (acc ai);
+# API keys are read from the environment, never stored here.
+engine:
+  trigger:
+    mode: commits
+    threshold: 3
+  supervisor:
+    enabled: false
+    threshold: 85
+    max_iterations: 3
+  ai:
+    retries: 3
+    retry_delay_ms: 1000
+    fallback: true
+    max_consecutive_failures: 3
+
+# -----------------------------------------------------------------------------
+# AI Providers (optional, AI SDK v5)
+# -----------------------------------------------------------------------------
+# Explicit opt-in: with enabled: false nothing loads and no network call
+# ever happens at config/graph/scan time.
+ai:
+  enabled: false
+  # default: main
+  # providers:
+  #   - id: main
+  #     provider: openai
+  #     model: gpt-4o
+  #     api_key_env: OPENAI_API_KEY
+
+# -----------------------------------------------------------------------------
+# Multi-Agent Orchestration
+# -----------------------------------------------------------------------------
+multi_agent:
+  enabled: false
+  max_concurrency: 4
+  max_depth: 1
+  task_timeout: 300
+  resource_limits:
+    cpu_percent: 80
+    memory_mb: 4096
+    token_budget: 1000000
+  isolation_mode: "git_worktree"
+  conflict_policy: "sequentialize"
+
+# -----------------------------------------------------------------------------
+# Context Engine Defaults
+# -----------------------------------------------------------------------------
+context:
+  default_depth: 1
+  default_max_bytes: 65536
+  default_include:
+    - "hierarchy"
+    - "contract"
+    - "dependencies"
+    - "constraints"
+    - "implementations"
+
+# -----------------------------------------------------------------------------
+# Graph Defaults
+# -----------------------------------------------------------------------------
+graph:
+  default_format: "json"
+  default_provenance: true
+
+# -----------------------------------------------------------------------------
+# Memory Defaults
+# -----------------------------------------------------------------------------
+memory:
+  warn_bytes: 65536
+  timestamp_format: "rfc3339"
+
+# -----------------------------------------------------------------------------
+# Discovery Defaults
+# -----------------------------------------------------------------------------
+discover:
+  default_kinds:
+    - "missing-contract"
+    - "missing-dependency"
+    - "stale-dependency"
+    - "unknown-owner"
+    - "orphan-code"
+
+# -----------------------------------------------------------------------------
+# Tooling Subsystem
+# -----------------------------------------------------------------------------
+tools:
+  auto_discover: true
+  plugins:
+    enabled: true
+    directory: ".acc/config/tools"
