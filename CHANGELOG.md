@@ -67,6 +67,14 @@ the project stays on 0.x and everything may change.
 
 ### Changed
 
+- Environment-builder CLI upgraded to proagent v0.14.0 (from v0.13.0): the
+  full validation gate re-ran green on the new version (architecture valid,
+  spec+lock no findings, 25/25 profiles valid, crew PA043–PA048 clean, acc
+  check clean). Upstream has not yet fixed the buildGraph self-edge/orphan
+  defects or the interview id-collision, so the local graph patch was
+  re-applied to the installed CLI (verified required by regenerating the
+  spec unpatched: same PA004 + 2×PA007 findings). The reference in
+  `docs/agent-environment.md` was bumped accordingly.
 - Composed professional skill directory retains the release-checklist
   knowledge file (`knowledge/release-checklist.json`) after the Freebuff
   re-setup; setup's known limitation of not copying packaged-registry

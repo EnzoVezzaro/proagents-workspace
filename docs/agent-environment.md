@@ -10,7 +10,7 @@ Two CLIs appear in this ecosystem — do not confuse them:
 
 | CLI | Role | Status |
 |-----|------|--------|
-| `proagent` | Environment builder: compiles profiles and crews into harness artifacts from `proagents.yaml` | Installed tooling (v0.13.x) |
+| `proagent` | Environment builder: compiles profiles and crews into harness artifacts from `proagents.yaml` | Installed tooling (v0.14.x) |
 | `paw` | This product's own CLI for creating and operating workspaces | Specification only — see [CLI Reference](cli-reference.md), not yet implemented |
 
 All commands on this page are `proagent` commands. They configure the repository's agent environment; they are not `paw` workspace commands.
