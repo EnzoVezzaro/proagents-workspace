@@ -1,0 +1,266 @@
+{
+  "id": "agent-team",
+  "name": "agent-team",
+  "version": "0.1.0",
+  "description": "Custom crew derived from the interview: professional profile: api documentation, architecture explainers and onboarding guides — written for the reader under pressure, examples over abstraction; server-side systems: apis, data integrity, re",
+  "author": "local",
+  "tags": [
+    "custom",
+    "from-interview"
+  ],
+  "workers": [
+    {
+      "id": "technical-writer",
+      "name": "technical-writer",
+      "role": "coordinator",
+      "description": "Operates as the technical-writer profile; role in this crew: coordinator.",
+      "profile": "technical-writer",
+      "permissions": {
+        "read": "repo",
+        "write": "scoped",
+        "production": "none",
+        "secrets": "none",
+        "tools": [
+          "filesystem",
+          "shell",
+          "git",
+          "test runner",
+          "acc check",
+          "link check"
+        ],
+        "approvalGates": []
+      },
+      "mcpServers": [],
+      "context": [
+        {
+          "framework": "acc",
+          "scope": "repository"
+        }
+      ],
+      "instructions": "",
+      "receivesFrom": [
+        "qa-engineer"
+      ],
+      "emits": [
+        "documentation-update.md",
+        "review-verdict.md"
+      ]
+    },
+    {
+      "id": "backend-engineer",
+      "name": "backend-engineer",
+      "role": "implementation",
+      "description": "Operates as the backend-engineer profile; role in this crew: implementation.",
+      "profile": "backend-engineer",
+      "permissions": {
+        "read": "repo",
+        "write": "scoped",
+        "production": "none",
+        "secrets": "none",
+        "tools": [
+          "filesystem",
+          "shell",
+          "git",
+          "test runner",
+          "nodejs",
+          "vitest"
+        ],
+        "approvalGates": [
+          "apply changes outside the working tree"
+        ]
+      },
+      "mcpServers": [],
+      "context": [
+        {
+          "framework": "acc",
+          "scope": "repository"
+        }
+      ],
+      "instructions": "",
+      "receivesFrom": [],
+      "emits": [
+        "patches.md",
+        "change-description.md"
+      ]
+    },
+    {
+      "id": "devops-engineer",
+      "name": "devops-engineer",
+      "role": "operator",
+      "description": "Operates as the devops-engineer profile; role in this crew: operator.",
+      "profile": "devops-engineer",
+      "permissions": {
+        "read": "repo",
+        "write": "none",
+        "production": "write",
+        "secrets": "none",
+        "tools": [
+          "filesystem",
+          "shell",
+          "git",
+          "docker",
+          "kubernetes (read-only)"
+        ],
+        "approvalGates": [
+          "every production action"
+        ]
+      },
+      "mcpServers": [],
+      "context": [
+        {
+          "framework": "acc",
+          "scope": "repository"
+        }
+      ],
+      "instructions": "",
+      "receivesFrom": [
+        "qa-engineer"
+      ],
+      "emits": [
+        "rollout-log.md"
+      ]
+    },
+    {
+      "id": "qa-engineer",
+      "name": "qa-engineer",
+      "role": "reviewer",
+      "description": "Operates as the qa-engineer profile; role in this crew: reviewer.",
+      "profile": "qa-engineer",
+      "permissions": {
+        "read": "repo",
+        "write": "none",
+        "production": "none",
+        "secrets": "none",
+        "tools": [
+          "filesystem",
+          "shell",
+          "git",
+          "test runner",
+          "vitest",
+          "playwright"
+        ],
+        "approvalGates": []
+      },
+      "mcpServers": [],
+      "context": [
+        {
+          "framework": "acc",
+          "scope": "repository"
+        }
+      ],
+      "instructions": "",
+      "receivesFrom": [
+        "backend-engineer"
+      ],
+      "emits": [
+        "review-verdict.md",
+        "approved-change-plan.md"
+      ]
+    },
+    {
+      "id": "release-engineer",
+      "name": "release-engineer",
+      "role": "operator",
+      "description": "Operates as the release-engineer profile; role in this crew: operator.",
+      "profile": "release-engineer",
+      "permissions": {
+        "read": "repo",
+        "write": "scoped",
+        "production": "write",
+        "secrets": "named",
+        "tools": [
+          "filesystem",
+          "shell",
+          "git",
+          "npm publish",
+          "acc check"
+        ],
+        "approvalGates": [
+          "every production action",
+          "npm publish"
+        ]
+      },
+      "mcpServers": [],
+      "context": [
+        {
+          "framework": "acc",
+          "scope": "repository"
+        }
+      ],
+      "instructions": "",
+      "receivesFrom": [
+        "qa-engineer"
+      ],
+      "emits": [
+        "release-plan.md",
+        "release-notes.md",
+        "changelog-entry.md"
+      ]
+    },
+    {
+      "id": "security-engineer",
+      "name": "security-engineer",
+      "role": "reviewer",
+      "description": "Operates as the security-engineer profile; role in this crew: reviewer.",
+      "profile": "security-engineer",
+      "permissions": {
+        "read": "repo",
+        "write": "none",
+        "production": "none",
+        "secrets": "none",
+        "tools": [
+          "filesystem",
+          "shell",
+          "git",
+          "test runner"
+        ],
+        "approvalGates": []
+      },
+      "mcpServers": [],
+      "context": [
+        {
+          "framework": "acc",
+          "scope": "repository"
+        }
+      ],
+      "instructions": "",
+      "receivesFrom": [
+        "backend-engineer"
+      ],
+      "emits": [
+        "security-review.md"
+      ]
+    }
+  ],
+  "mcpServers": [],
+  "handoffs": [],
+  "entryPoints": [
+    "backend-engineer"
+  ],
+  "createdAt": "2026-01-01T00:00:00.000Z",
+  "updatedAt": "2026-01-01T00:00:00.000Z",
+  "mission": "Build and operate the ProAgents Workspace (paw CLI, kernel, SDK) as a coordinated professional team: implementation, dual review (quality + security), gated operations, and documentation - with releases reversible and production actions human-approved.",
+  "coordination": [
+    "[missing section file: coordination/01-members-coordinate-exclusively-through-named.json]",
+    "[missing section file: coordination/02-a-member-that-cannot-meet-its-handoff-contrac.json]"
+  ],
+  "tasks": [
+    "[missing section file: tasks/01-technical-writer-owns-the-documentation-work.json]",
+    "[missing section file: tasks/02-backend-engineer-owns-the-implementation-work.json]",
+    "[missing section file: tasks/03-devops-engineer-owns-the-operations-work-for.json]",
+    "[missing section file: tasks/04-qa-engineer-owns-the-review-work-for-this-cre.json]",
+    "[missing section file: tasks/05-release-engineer-owns-the-operations-work-for.json]",
+    "[missing section file: tasks/06-security-engineer-owns-the-review-work-for-th.json]"
+  ],
+  "workflows": [
+    "[missing section file: workflows/01-standard-run-start-at-the-entry-member-foll.json]"
+  ],
+  "rules": [
+    "[missing section file: rules/01-every-member-stays-inside-its-permission-model.json]",
+    "[missing section file: rules/02-handoff-artifacts-are-named-and-reviewable.json]"
+  ],
+  "verification": [
+    "[missing section file: verification/01-each-handoff-artifact-exists-and-names-its-pr.json]",
+    "[missing section file: verification/02-no-member-exceeded-its-permission-model-chec.json]"
+  ]
+}

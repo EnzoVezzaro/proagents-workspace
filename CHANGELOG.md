@@ -9,6 +9,24 @@ the project stays on 0.x and everything may change.
 
 ## [Unreleased]
 
+### Changed
+
+- Crew brought to the registry crew folder standard (per
+  proagents.reposell.dev/guide/registry and /guide/profiles): members bind
+  registry profiles (`profile` field — expertise, methods, rules, and
+  verification hydrate from the profile, never from the crew), every member
+  carries an explicit permission model (production `write` only on operators,
+  `secrets: named` only on release-engineer, approval gates on every
+  production/publish action), context framework is `acc`, and section files
+  (mission, members, coordination, tasks, workflows, handoffs, rules,
+  verification) are clean named artifacts. Crew validates clean against the
+  PA043–PA048 subagent standards; all 25 registry profiles pass
+  `proagent validate --profiles` (PA030–PA038). Installed via
+  `proagent crew build` to `.agents/crews/agent-team/` (workers/ layout,
+  profile-hydrated SKILL.md + agent.json permission contract per worker);
+  the earlier flat `.agents/skills/<profession>/` directories built from the
+  raw session are removed as superseded.
+
 ### Added
 
 - Rebuilt ProAgents interview from a fresh `proagent init` session (6415865f):
@@ -17,10 +35,11 @@ the project stays on 0.x and everything may change.
   runtime, input/output contract) and reached READY at 80% confidence with
   19 facts and zero contradictions.
 - Generated the agent architecture spec (`proagent spec`): decision
-  agent-team with 6 profile-bound members mirroring `.acc/config/agents/`
+  agent-team with 6 members mirroring `.acc/config/agents/`
   (technical-writer coordinator, backend-engineer, qa-engineer,
-  security-engineer, devops-engineer, release-engineer), compiled into 6
-  per-agent skills under `.agents/skills/` plus `agent-architecture.json`.
+  security-engineer, devops-engineer, release-engineer), materialized as the
+  registry-standard crew `.agents/crews/agent-team/` plus
+  `agent-architecture.json`.
 - Freebuff is the primary harness: `proagents.yaml` compatibility now lists
   freebuff first, `proagent setup --harness freebuff` compiled the composed
   professional skill, the AGENTS.md profile block, and `.mcp.json` for the

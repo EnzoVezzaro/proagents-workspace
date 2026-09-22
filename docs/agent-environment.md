@@ -49,23 +49,24 @@ proagents.yaml  ──resolve──►  proagents.lock  ──validate──► 
 `proagent setup` compiles the declared professions into harness artifacts:
 
 - **Composed professional skill** — `.agents/skills/<all-professions>/SKILL.md`, one agent carrying all eight professions, plus its `manifest.json` and knowledge files.
-- **Crew skills** — `.agents/skills/<profession>/` per member of the generated agent team (each with `SKILL.md`, a machine-readable `agent.json`, and `references/permissions.md` + `escalation.md`), plus `agent-architecture.json` recording the team decision, members, and handoff graph.
+- **Crew** — `.agents/crews/agent-team/` per the registry crew folder standard: a crew-level `manifest.json` + `SKILL.md` and a `workers/<member>/` directory per member (each with `SKILL.md` hydrating its bound registry profile and a machine-readable `agent.json` permission contract). The crew source of truth is `.proagent/crews/agent-team/` (mission, members, coordination, tasks, workflows, handoffs, rules, verification), validated against the PA043–PA048 subagent standards by `proagent crew validate`.
 - **Harness config** — the `AGENTS.md` profile block and `.mcp.json` MCP servers.
+- **Architecture record** — `.agents/skills/agent-architecture.json` records the team decision, members, and handoff graph from the interview.
 
-## The Agent Team
+## The Agent Team (Crew)
 
-The architecture was derived from a structured interview (`proagent init` → `proagent spec`): decision **agent team**, six profile-bound members mirroring the ACC expertise map.
+The architecture was derived from a structured interview (`proagent init` → `proagent spec`): decision **agent team**, six members — each bound to a registry profile (the crew carries permissions and wiring; expertise, methods, rules, and verification come from the profile, never from the crew).
 
-| Member | Role | Permission shape |
-|--------|------|------------------|
-| technical-writer | coordinator / documentation | documentation writes, no production access |
-| backend-engineer | implementation | working-tree patches, escalation gate outside the tree |
-| qa-engineer | review | review comments only |
-| security-engineer | review | review comments only |
-| devops-engineer | operations | production write, every action human-approved |
-| release-engineer | operations | production write, every action human-approved |
+| Member (id) | Profile | Crew role | Permission shape |
+|--------|------|------------------|------------------|
+| technical-writer | `technical-writer` | coordinator | repo read, scoped writes, no production |
+| backend-engineer | `backend-engineer` | implementation | scoped writes, escalation gate outside the working tree |
+| qa-engineer | `qa-engineer` | reviewer | review only — no writes, no production |
+| security-engineer | `security-engineer` | reviewer | review only — no writes, no production |
+| devops-engineer | `devops-engineer` | operator | production write, **every action approval-gated** |
+| release-engineer | `release-engineer` | operator | production write + named secrets, **publish approval-gated** |
 
-Handoffs: backend-engineer sends patches to both reviewers; their verdict aggregates to the coordinator; approved change plans hand off to both operators. The full graph, permissions, and provenance are in `.agents/skills/agent-architecture.json`.
+Handoffs: backend-engineer sends `patches.md` to both reviewers; their verdicts aggregate to the coordinator; `approved-change-plan.md` hands off to both operators. Crew rules add repo-wide guards (no force push, no history rewrite, production needs human approval) and verification (artifacts exist and name their producer; the release gate runs before any publish).
 
 ## Regenerating the Environment
 
@@ -80,7 +81,14 @@ proagent setup --harness freebuff   # recompile harness artifacts
 
 ### After changing professions, capabilities, or policies
 
-Edit `proagents.yaml` first, then run the same four commands. Never edit `.agents/skills/` or the `AGENTS.md` profile block by hand — they are build outputs and the next `setup` overwrites them.
+Edit `proagents.yaml` first, then run the same four commands. Never edit `.agents/skills/`, `.agents/crews/`, or the `AGENTS.md` profile block by hand — they are build outputs and the next build overwrites them.
+
+To change the crew itself, edit the crew source under `.proagent/crews/agent-team/` (members bind profiles; permissions are explicit per member), validate, and rebuild:
+
+```bash
+proagent crew validate .proagent/crews/agent-team
+proagent crew build .proagent/crews/agent-team/manifest.json
+```
 
 ### Re-running the interview (full rebuild)
 
@@ -104,6 +112,8 @@ Interview guidance, learned the hard way:
 ```bash
 proagent validate           # architecture: 0 errors, 0 warnings
 proagent validate --spec    # spec + lock: no findings
+proagent validate --profiles # registry profiles: all pass (PA030–PA038)
+proagent crew validate .proagent/crews/agent-team   # crew: PA043–PA048 clean
 acc check                   # repository contract: 0 diagnostics
 ```
 

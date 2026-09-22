@@ -1,0 +1,35 @@
+{
+  "id": "agent-team-devops-engineer",
+  "crew": "agent-team",
+  "role": "operator",
+  "permissions": {
+    "read": "repo",
+    "write": "none",
+    "production": "write",
+    "secrets": "none",
+    "tools": [
+      "filesystem",
+      "shell",
+      "git",
+      "docker",
+      "kubernetes (read-only)"
+    ],
+    "approvalGates": [
+      "every production action"
+    ]
+  },
+  "mcpServers": [],
+  "context": [
+    {
+      "framework": "acc",
+      "scope": "repository"
+    }
+  ],
+  "receivesFrom": [
+    "qa-engineer"
+  ],
+  "emits": [
+    "rollout-log.md"
+  ],
+  "version": "0.1.0"
+}

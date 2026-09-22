@@ -1,0 +1,38 @@
+{
+  "id": "agent-team-release-engineer",
+  "crew": "agent-team",
+  "role": "operator",
+  "permissions": {
+    "read": "repo",
+    "write": "scoped",
+    "production": "write",
+    "secrets": "named",
+    "tools": [
+      "filesystem",
+      "shell",
+      "git",
+      "npm publish",
+      "acc check"
+    ],
+    "approvalGates": [
+      "every production action",
+      "npm publish"
+    ]
+  },
+  "mcpServers": [],
+  "context": [
+    {
+      "framework": "acc",
+      "scope": "repository"
+    }
+  ],
+  "receivesFrom": [
+    "qa-engineer"
+  ],
+  "emits": [
+    "release-plan.md",
+    "release-notes.md",
+    "changelog-entry.md"
+  ],
+  "version": "0.1.0"
+}

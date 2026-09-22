@@ -1,0 +1,32 @@
+{
+  "id": "agent-team-security-engineer",
+  "crew": "agent-team",
+  "role": "reviewer",
+  "permissions": {
+    "read": "repo",
+    "write": "none",
+    "production": "none",
+    "secrets": "none",
+    "tools": [
+      "filesystem",
+      "shell",
+      "git",
+      "test runner"
+    ],
+    "approvalGates": []
+  },
+  "mcpServers": [],
+  "context": [
+    {
+      "framework": "acc",
+      "scope": "repository"
+    }
+  ],
+  "receivesFrom": [
+    "backend-engineer"
+  ],
+  "emits": [
+    "security-review.md"
+  ],
+  "version": "0.1.0"
+}

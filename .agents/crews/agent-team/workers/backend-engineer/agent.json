@@ -1,0 +1,35 @@
+{
+  "id": "agent-team-backend-engineer",
+  "crew": "agent-team",
+  "role": "implementation",
+  "permissions": {
+    "read": "repo",
+    "write": "scoped",
+    "production": "none",
+    "secrets": "none",
+    "tools": [
+      "filesystem",
+      "shell",
+      "git",
+      "test runner",
+      "nodejs",
+      "vitest"
+    ],
+    "approvalGates": [
+      "apply changes outside the working tree"
+    ]
+  },
+  "mcpServers": [],
+  "context": [
+    {
+      "framework": "acc",
+      "scope": "repository"
+    }
+  ],
+  "receivesFrom": [],
+  "emits": [
+    "patches.md",
+    "change-description.md"
+  ],
+  "version": "0.1.0"
+}
