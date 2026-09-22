@@ -32,6 +32,25 @@ export interface WorkspaceEventMap {
   "agent/stopping": { provider: string; sessionId: string };
   "agent/stopped": { provider: string; sessionId: string };
 
+  // harness lifecycle — normalized harness-side events emitted by harness
+  // adapters (capability: harness). Distinct from agent/* (the Workspace
+  // agent session): session/* is the CODING HARNESS session the adapter
+  // attached to (OpenCode/Codex/Claude Code). `model/before` is awaited;
+  // subscribers (e.g. Repo Shield) may reject to veto a model generation
+  // before it executes inside the host harness (spec sections 101–102).
+  "session/starting": { harness: string; provider: string; sessionId?: string };
+  "session/started": { harness: string; provider: string; sessionId: string };
+  "session/stopping": { harness: string; provider: string; sessionId: string; reason?: string };
+  "session/stopped": { harness: string; provider: string; sessionId: string; reason?: string };
+  "model/before": { harness: string; provider: string; sessionId: string; promptLength: number };
+  "model/after": { harness: string; provider: string; sessionId: string; ok: boolean; durationMs: number };
+  "model/error": { harness: string; provider: string; sessionId: string; error: WorkspaceErrorShape };
+  // context compaction — observational for now; prompts are never copied
+  // into events (spec section 100).
+  "compaction/planned": { harness: string; provider: string; sessionId: string; tokensBefore: number; tokensAfter: number };
+  "compaction/started": { harness: string; provider: string; sessionId: string };
+  "compaction/completed": { harness: string; provider: string; sessionId: string; tokensDropped: number };
+
   // commands & tools — `before` events are awaited; subscribers may reject
   "command/before": { command: string; args: readonly string[]; cwd?: string };
   "command/after": { command: string; args: readonly string[]; exitCode: number; durationMs: number };

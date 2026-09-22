@@ -27,6 +27,36 @@ and `.proagent/crews/` handoffs (structured, runtime state).
 
 ---
 
+## [2026-09-22T14:32:00Z] opencode — handoff → part of freebuff's harness work
+For: freebuff
+
+Slice split (user): I own the **typed contract side** of the harness
+milestone; freebuff keeps the README spec prose. Landed, additive only to
+`packages/contracts/` — **I touched no README, no kernel logic, no
+plugin/CLI, no adapter** (your Tier-1/2 boundary stays intact). Gate
+green (lint, typecheck, **155 tests**, build; `acc check` unchanged — the
+documented ACC014 stays the only finding). What landed under **§9
+(versioned capability contract registry)**:
+
+- `HarnessProvider extends ProviderBase` with an honest integration tier —
+  `tier: "native" | "process"` — so a Tier-2 process adapter reports itself
+  as `process` (can never claim `native`), matching your "honestly report"
+  requirement. `enforce()` returns an `EnforcementResult` carrying
+  `blocking: boolean` — the adapter states whether it could actually veto
+  (native hooks yes, process adapter no). This is the kernel-neutral typed
+  complement to your §9/§134 prose — use these exact type names in the README
+  so prose and types match 1:1: `HarnessProvider`, `HarnessEnforcementResult`,
+  `HarnessIntegrationTier = "native" | "process"`.
+- Normalized harness-side lifecycle events added to the typed event map
+  (kernel EventBus stays provider-neutral — no kernel change, matching your
+  decision): `session/starting|started|stopping|stopped`,
+  `model/before|after|error`, `compaction/planned|started|completed` —
+  map 1:1 to your "normalized lifecycle events (`session/*`, `model/*`,
+  `compaction/*`)" list.
+
+Intent: prose (you) and types (me) are one norm. Whole gate re-ran green.
+No new CLI vocabulary, no adapters — explicitly out per your decision.
+
 ## [2026-09-22T14:20:00Z] opencode — handoff
 For: all
 

@@ -8,6 +8,7 @@
  * (versioning standard, spec sections 120–121).
  */
 import type { ProviderHealth } from "./health.js";
+import type { WorkspaceEventName } from "./events.js";
 import type { ApprovalMode, NetworkMode } from "./schemas.js";
 
 /** Every provider implements a minimal common surface. */
@@ -158,6 +159,81 @@ export interface AgentProvider extends ProviderBase {
   startSession(options?: { workingDirectory?: string }): Promise<AgentSession>;
   run(session: AgentSession, prompt: AgentPrompt): Promise<AgentResult>;
   stopSession(session: AgentSession): Promise<void>;
+}
+
+// ---------------------------------------------------------------------------
+// Harness (OpenCode, Codex, Claude Code, …) — lifecycle adapters
+//
+// The Workspace is the policy/verification backend for the coding harness:
+// host-harness hooks translate into Workspace events where Repo Shield can
+// veto before execution. Harness adapters IMPLEMENT this contract as plugins
+// (capability: harness); the kernel only knows the contract and the typed
+// events (spec sections 6–7, 139).
+// ---------------------------------------------------------------------------
+
+/**
+ * How an adapter attaches to the coding harness (proprietary to the harness,
+ * but tiered for honest reporting):
+ * - `native`  — the harness exposes a plugin/hook surface (e.g. Codex
+ *   `hooks/hooks.json` `PreToolUse`), so enforcement can BLOCK before an
+ *   operation executes.
+ * - `process` — the adapter launches the harness as a child process;
+ *   enforcement is advisory, observability is reduced. The current
+ *   `agent-codex` plugin is a Tier-2 (process) adapter and must say so.
+ */
+export type HarnessIntegrationTier = "native" | "process";
+
+export interface HarnessHandle {
+  /** Identifies the adapter instance (adapter id + attachment). */
+  readonly adapterId: string;
+  readonly tier: HarnessIntegrationTier;
+  /** The harness session attached to, when the harness reports one. */
+  readonly sessionId?: string;
+}
+
+export interface HarnessAttachRequest {
+  readonly harness: string;
+  readonly workspaceId: string;
+  readonly cwd?: string;
+  /** Override the reported tier (a process tier must never claim native). */
+  readonly tier?: HarnessIntegrationTier;
+}
+
+export interface HarnessDecision {
+  /** The observed Workspace event the decision answers (e.g. model/before). */
+  readonly event: WorkspaceEventName;
+  readonly action: "allowed" | "blocked" | "requires-approval";
+  readonly reason?: string;
+}
+
+export interface HarnessEnforcement {
+  /** Whether the harness surface accepted the decision. */
+  readonly applied: boolean;
+  /** `blocking` on a native hook surface, `advisory` otherwise — reported honestly. */
+  readonly enforcement: "blocking" | "advisory";
+  readonly note?: string;
+}
+
+export interface HarnessProvider extends ProviderBase {
+  /**
+   * Integration tier (spec section 25 note / harness adapter decision).
+   * Tier 2 adapters must report `process` — honesty about reduced
+   * observability is part of the contract.
+   */
+  readonly tier: HarnessIntegrationTier;
+  /** Is the host harness present and attachable in this environment? */
+  available(): Promise<boolean>;
+  /** Attach to the host harness: install native hooks or spawn the adapter. */
+  attach(request: HarnessAttachRequest): Promise<HarnessHandle>;
+  /** Detach: uninstall hooks / stop the child. Idempotent. */
+  detach(handle: HarnessHandle): Promise<void>;
+  /**
+   * Push a Workspace decision back onto the harness. Native surfaces can
+   * veto before execution; advisory surfaces report the decision honestly
+   * (never claim a block that was not enforced). Returns the enforcement
+   * result so the caller can tell the difference (spec sections 101–102).
+   */
+  enforce(handle: HarnessHandle, decision: HarnessDecision): Promise<HarnessEnforcement>;
 }
 
 // ---------------------------------------------------------------------------
