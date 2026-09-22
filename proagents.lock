@@ -1,5 +1,5 @@
 schema: proagents/lock/v1
-specHash: sha256:9b665ffba1404d1e2a38d67c9c2567bf1918ff68206233f2d1a9f6e42540694e
+specHash: sha256:ef1b8898808b1a6c78d406e96c71f1d8351472afdcf275fc9235880266c0d51b
 resolved:
   browser-automation:
     source: proagents

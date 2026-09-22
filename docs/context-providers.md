@@ -102,7 +102,7 @@ Every graph fact carries provenance:
 - **Inferred** - From `acc discover` (suggestions only)
 - **Memory** - From `.acc-memory.md` (agent knowledge)
 
-This provenance feeds [impact-aware verification](verification.md#impact-aware-verification) and [protection context](protection.md#protection--acc).
+This provenance feeds [impact-aware verification](verification.md#impact-aware-verification) and [protection context](protection.md#protection-policy-configuration).
 
 ## Context Lifecycle
 

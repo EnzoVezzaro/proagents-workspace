@@ -24,6 +24,8 @@ interface AgentProvider {
 
 ## ProAgents Integration (Official)
 
+This repository consumes this integration itself: its professions, capabilities, and policies are declared in `proagents.yaml` and compiled into harness artifacts. See [Agent Environment](agent-environment.md) for the concrete setup and regeneration pipeline.
+
 ### Configuration
 
 ```yaml

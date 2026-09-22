@@ -11,27 +11,56 @@ the project stays on 0.x and everything may change.
 
 ### Added
 
-- ProAgents professional environment: `proagents.yaml` (the human-authored
-  environment spec) declares the professions this project needs —
-  staff-engineer, security-engineer, technical-writer, backend-engineer,
-  devops-engineer, qa-engineer, sre, release-engineer (one per ACC expertise
-  domain in `.acc/config/agents/`) — plus the capabilities browser-automation,
-  database-access, and source-control, with workspace-only filesystem policy
-  and an explicit network allowlist mirroring the product's own restricted
-  network model.
-- `proagents.lock` (checksummed, reproducible resolution graph) from
-  `proagent resolve` → `proagent lock` → `proagent validate --spec`.
-- Equipped harness artifacts compiled for OpenCode: the composed professional
-  skill under `.agents/skills/`, the profile block in `AGENTS.md`,
-  `opencode.json` rule enforcement (force push and destructive shell commands
-  denied), and `.mcp.json` MCP servers (postgres, kubernetes, playwright,
-  github) resolved from the declared capabilities.
+- Rebuilt ProAgents interview from a fresh `proagent init` session (6415865f):
+  the original auto-derived intent produced only 3 shallow questions; the new
+  session walked the full topic questionnaire (write access, validation,
+  runtime, input/output contract) and reached READY at 80% confidence with
+  19 facts and zero contradictions.
+- Generated the agent architecture spec (`proagent spec`): decision
+  agent-team with 6 profile-bound members mirroring `.acc/config/agents/`
+  (technical-writer coordinator, backend-engineer, qa-engineer,
+  security-engineer, devops-engineer, release-engineer), compiled into 6
+  per-agent skills under `.agents/skills/` plus `agent-architecture.json`.
+- Freebuff is the primary harness: `proagents.yaml` compatibility now lists
+  freebuff first, `proagent setup --harness freebuff` compiled the composed
+  professional skill, the AGENTS.md profile block, and `.mcp.json` for the
+  Freebuff adapter (AGENTS.md + shared `.agents/skills` + MCP; policy is
+  advisory in skill text — Freebuff has no native rule-enforcement surface,
+  reported honestly by setup).
 
 ### Fixed
 
-- Installed the `release-checklist.json` knowledge file into the composed skill
-  directory; `proagent setup` references it but does not copy it from the
-  packaged registry.
+- proagent v0.13.0 graph bugs (patched locally in the installed CLI, original
+  preserved as `specification.js.bak-0.13.0`): PA004 self-edge when the
+  coordinator is also the documenter, and PA007 orphaned agents when the
+  catalog matches more than one member per role. `proagent validate` now
+  reports 0 errors / 0 warnings for the generated architecture.
+- proagent v0.13.0 interview id-collision: derived follow-up questions reuse
+  ids of already-persisted seed questions and are silently dropped (the
+  inputs-outputs probe was lost). Worked around by injecting the question into
+  the session file and answering it through the normal CLI.
+- Stale OpenCode artifacts removed: `opencode.json` (denied rules never
+  applied on Freebuff) deleted; all skill text now names the freebuff harness.
+  Force-push, branch-deletion, and history-rewrite guards remain declared in
+  `proagents.yaml` policies and the AGENTS.md profile rules.
+- Re-ran `proagent resolve` → `lock` → `validate --spec` after the harness
+  change: 3 capabilities resolved, spec+lock validation ok.
+
+### Changed
+
+- Composed professional skill directory retains the release-checklist
+  knowledge file (`knowledge/release-checklist.json`) after the Freebuff
+  re-setup; setup's known limitation of not copying packaged-registry
+  knowledge files did not recur, but the file is verified present.
+- `docs/agent-environment.md` — new documentation page covering this repository's
+  own ProAgents agent environment: `proagents.yaml`/`proagents.lock`, the
+  compiled `.agents/skills/` artifacts (composed profile + six-member crew),
+  the regeneration pipeline (`proagent resolve → lock → validate --spec →
+  setup --harness freebuff` and the interview-based `init → spec → build`
+  rebuild), and an honest statement of what is declared versus actually
+  enforced. Wired into `docs/index.md` (Getting Started) and cross-linked from
+  `docs/agent-providers.md`; fixed a broken `protection.md` anchor link in
+  `docs/context-providers.md` found by the link check.
 
 ## [0.1.0] - 2026-09-21
 

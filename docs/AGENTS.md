@@ -23,7 +23,7 @@ Owner: proagents-workspace maintainers
 
 ## Outputs
 
-- The documentation index (`index.md`) and 14 concept/provider/reference documents.
+- The documentation index (`index.md`) and 15 concept/provider/reference documents.
 - The `workspace.yaml` configuration reference (`configuration.md`).
 - The `paw` CLI contract (`cli-reference.md`).
 
@@ -46,7 +46,7 @@ Owner: proagents-workspace maintainers
 Organized as a documentation set with a single entry point:
 
 - `index.md` — the table of contents, grouped: Getting Started, Concepts, Providers, Safety & Trust, Distribution.
-- Getting started: `getting-started.md`, `configuration.md`, `cli-reference.md`.
+- Getting started: `getting-started.md`, `configuration.md`, `cli-reference.md`, `agent-environment.md`.
 - Concepts: `product-model.md`, `architecture.md`, `lifecycle.md`.
 - Providers: `runtime-providers.md`, `repository-providers.md`, `context-providers.md`, `agent-providers.md`.
 - Safety & Trust: `security.md`, `protection.md`, `verification.md`.

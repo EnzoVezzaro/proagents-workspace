@@ -53,7 +53,9 @@ policies:
 
 harness:
   # Mode: compatible — never a pin. Same environment, any of these adapters.
+  # Primary harness: Freebuff (AGENTS.md + shared .agents/skills + MCP; no
+  # native rule enforcement — policy constraints travel inside the skill text).
   compatibility:
-    - opencode
+    - freebuff
     - codex
     - claude-code
