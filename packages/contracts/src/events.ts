@@ -1,0 +1,87 @@
+/**
+ * Typed event bus contract (spec section 7).
+ *
+ * Events are the major extension point: providers integrate through events,
+ * never by importing each other (architecture standard).
+ */
+import type { WorkspaceErrorShape } from "./errors.js";
+
+/** Event payload shapes, keyed by event name (spec section 7). */
+export interface WorkspaceEventMap {
+  // workspace lifecycle
+  "workspace/creating": { workspaceId: string };
+  "workspace/created": { workspaceId: string };
+  "workspace/initializing": { workspaceId: string };
+  "workspace/ready": { workspaceId: string };
+  "workspace/starting": { workspaceId: string };
+  "workspace/started": { workspaceId: string };
+  "workspace/stopping": { workspaceId: string };
+  "workspace/stopped": { workspaceId: string };
+  "workspace/destroyed": { workspaceId: string };
+  "workspace/error": { workspaceId: string; error: WorkspaceErrorShape };
+
+  // repository
+  "repository/connecting": { provider: string; repository: string };
+  "repository/cloning": { provider: string; repository: string };
+  "repository/cloned": { provider: string; repository: string; commit?: string };
+  "repository/changed": { provider: string; repository: string };
+
+  // agent
+  "agent/starting": { provider: string };
+  "agent/started": { provider: string; sessionId: string };
+  "agent/stopping": { provider: string; sessionId: string };
+  "agent/stopped": { provider: string; sessionId: string };
+
+  // commands & tools — `before` events are awaited; subscribers may reject
+  "command/before": { command: string; args: readonly string[]; cwd?: string };
+  "command/after": { command: string; args: readonly string[]; exitCode: number; durationMs: number };
+  "tool/before": { tool: string; operation: string; inputs?: Readonly<Record<string, unknown>> };
+  "tool/after": { tool: string; operation: string; ok: boolean; durationMs: number };
+
+  // context
+  "context/indexing": { provider: string };
+  "context/indexed": { provider: string };
+
+  // filesystem — `before-write` is awaited; subscribers (e.g. protection) may reject
+  "filesystem/before-write": { path: string; size?: number };
+  "filesystem/after-write": { path: string; size: number };
+
+  // runtime
+  "runtime/health": { provider: string; healthy: boolean };
+  "runtime/error": { provider: string; error: WorkspaceErrorShape };
+
+  // verification
+  "verification/started": { commands: readonly string[] };
+  "verification/completed": { ok: boolean; durationMs: number };
+
+  // protection (Repo Shield layer)
+  "protection/intervened": { operation: string; target: string; action: "allowed" | "blocked" | "requires-approval" };
+}
+
+export type WorkspaceEventName = keyof WorkspaceEventMap;
+export type WorkspaceEvent<K extends WorkspaceEventName = WorkspaceEventName> = {
+  readonly name: K;
+  readonly payload: WorkspaceEventMap[K];
+  readonly timestamp: string;
+};
+
+export interface EventSubscription {
+  readonly id: string;
+  unsubscribe(): void;
+}
+
+/**
+ * The kernel-owned event bus. Handlers are awaited in registration order;
+ * a handler that throws turns the emit into a rejection so that
+ * before-execution subscribers (protection, permissions) can veto operations
+ * (spec sections 101–102).
+ */
+export interface EventBus {
+  on<K extends WorkspaceEventName>(
+    event: K,
+    handler: (payload: WorkspaceEventMap[K]) => void | Promise<void>,
+    options?: { once?: boolean }
+  ): EventSubscription;
+  off<K extends WorkspaceEventName>(event: K, handler: (payload: WorkspaceEventMap[K]) => void | Promise<void>): void;
+  emit<K extends WorkspaceEventName>(event: K, payload: WorkspaceEventMap[K]): Promise<void>;
+}

@@ -32,6 +32,7 @@ Owner: proagents-workspace maintainers
 ## Dependencies
 
 - docs/       (the documentation set distilled from the spec)
+- plugins/    (the bundled V1 plugin catalog exercised by the integration tests in `test/integration/`)
 
 ## Constraints
 

@@ -11,15 +11,14 @@ schema_version: 1
 # -----------------------------------------------------------------------------
 # Language Analyzers
 # -----------------------------------------------------------------------------
-# Off for now: the repository contains Markdown only. When implementation
-# code lands (packages for the kernel, providers, and the `paw` CLI),
-# enable the analyzers that match it.
+# Implementation has landed (kernel, plugins, and the `paw` CLI under
+# packages/ and plugins/), so the matching analyzers are enabled.
 language_analyzers:
   rust: false
-  typescript: false
+  typescript: true
   go: false
   python: false
-  javascript: false
+  javascript: true
 
 # -----------------------------------------------------------------------------
 # Ignore Patterns
@@ -30,6 +29,8 @@ ignore:
   - "dist/"
   - "build/"
   - "coverage/"
+  - "*dist"
+  - "*.map"
 
 # -----------------------------------------------------------------------------
 # Diagnostic Tuning

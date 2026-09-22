@@ -1,0 +1,8 @@
+packages:
+  - "packages/*"
+  - "plugins/*"
+  - "."
+
+# esbuild needs its postinstall to install the platform binary (vitest dependency)
+onlyBuiltDependencies:
+  - esbuild

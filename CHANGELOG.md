@@ -9,26 +9,17 @@ the project stays on 0.x and everything may change.
 
 ## [Unreleased]
 
-### Changed
-
-- Crew brought to the registry crew folder standard (per
-  proagents.reposell.dev/guide/registry and /guide/profiles): members bind
-  registry profiles (`profile` field — expertise, methods, rules, and
-  verification hydrate from the profile, never from the crew), every member
-  carries an explicit permission model (production `write` only on operators,
-  `secrets: named` only on release-engineer, approval gates on every
-  production/publish action), context framework is `acc`, and section files
-  (mission, members, coordination, tasks, workflows, handoffs, rules,
-  verification) are clean named artifacts. Crew validates clean against the
-  PA043–PA048 subagent standards; all 25 registry profiles pass
-  `proagent validate --profiles` (PA030–PA038). Installed via
-  `proagent crew build` to `.agents/crews/agent-team/` (workers/ layout,
-  profile-hydrated SKILL.md + agent.json permission contract per worker);
-  the earlier flat `.agents/skills/<profession>/` directories built from the
-  raw session are removed as superseded.
-
 ### Added
 
+- TypeScript implementation of the Workspace as a plugin system (pnpm monorepo):
+  - `@proagents/contracts` — the 16 capability contracts (spec section 9), stable error codes (§99), typed event map (§7), Zod schemas for `workspace.yaml` and plugin manifests (§59, §119).
+  - `@proagents/kernel` — event bus, service/capability registries, plugin discovery with dependency resolution and cycle detection, lifecycle state machine, declarative permission framework with approval modes (§34), health aggregation (§62–63), secrets-redacting structured logger (§100).
+  - `@proagents/workspace` (SDK) — `definePlugin` authoring surface + `WorkspaceClient`; the shared implementation surface for CLI and integrations (§64).
+  - `proagents-workspace` CLI (binary `paw`) — `doctor`, `plugin list`, `service list`, `config show`, `verify`; `--json` everywhere, `--headless` fails closed (§97).
+  - Eight capability plugins: `filesystem` (sandboxed, before-write veto), `shell` (before-execution veto + approval), `git` (conservative guards per §35), `runtime-local` (zero-cloud default, honestly not a sandbox), `runtime-docker` (isolated, honest degradation), `context-acc` (indexes `.acc/` packs), `agent-codex` (availability detection), `repo-shield` (protection layer vetoing destructive operations before execution, §101–102).
+- Integration test walking the spec §91 lifecycle flow (runtime → clone → context → edit → test → commit → guarded push) against the real plugins.
+- E2E smoke tests for the `paw` CLI binary.
+- `packages/AGENTS.md` and `plugins/AGENTS.md` functionality-local contracts.
 - Rebuilt ProAgents interview from a fresh `proagent init` session (6415865f):
   the original auto-derived intent produced only 3 shallow questions; the new
   session walked the full topic questionnaire (write access, validation,
@@ -47,26 +38,27 @@ the project stays on 0.x and everything may change.
   advisory in skill text — Freebuff has no native rule-enforcement surface,
   reported honestly by setup).
 
-### Fixed
-
-- proagent v0.13.0 graph bugs (patched locally in the installed CLI, original
-  preserved as `specification.js.bak-0.13.0`): PA004 self-edge when the
-  coordinator is also the documenter, and PA007 orphaned agents when the
-  catalog matches more than one member per role. `proagent validate` now
-  reports 0 errors / 0 warnings for the generated architecture.
-- proagent v0.13.0 interview id-collision: derived follow-up questions reuse
-  ids of already-persisted seed questions and are silently dropped (the
-  inputs-outputs probe was lost). Worked around by injecting the question into
-  the session file and answering it through the normal CLI.
-- Stale OpenCode artifacts removed: `opencode.json` (denied rules never
-  applied on Freebuff) deleted; all skill text now names the freebuff harness.
-  Force-push, branch-deletion, and history-rewrite guards remain declared in
-  `proagents.yaml` policies and the AGENTS.md profile rules.
-- Re-ran `proagent resolve` → `lock` → `validate --spec` after the harness
-  change: 3 capabilities resolved, spec+lock validation ok.
-
 ### Changed
 
+- Root `package.json` is now the monorepo meta-package; workspace members live under `packages/` and `plugins/`.
+- Permission grants are established before plugin activation, and plugins may refine scoped requests during activation (`PermissionFramework.refinePlugin`); grants remain intersected with configuration, so plugins can never self-grant (§59).
+- `WorkspaceClient` accepts a `catalog` option: bundled plugin sets activate only when the workspace configuration references them.
+- `paw doctor` aggregates provider-level health from registered capability services (service id included per entry).
+- Crew brought to the registry crew folder standard (per
+  proagents.reposell.dev/guide/registry and /guide/profiles): members bind
+  registry profiles (`profile` field — expertise, methods, rules, and
+  verification hydrate from the profile, never from the crew), every member
+  carries an explicit permission model (production `write` only on operators,
+  `secrets: named` only on release-engineer, approval gates on every
+  production/publish action), context framework is `acc`, and section files
+  (mission, members, coordination, tasks, workflows, handoffs, rules,
+  verification) are clean named artifacts. Crew validates clean against the
+  PA043–PA048 subagent standards; all 25 registry profiles pass
+  `proagent validate --profiles` (PA030–PA038). Installed via
+  `proagent crew build` to `.agents/crews/agent-team/` (workers/ layout,
+  profile-hydrated SKILL.md + agent.json permission contract per worker);
+  the earlier flat `.agents/skills/<profession>/` directories built from the
+  raw session are removed as superseded.
 - Environment-builder CLI upgraded to proagent v0.14.0 (from v0.13.0): the
   full validation gate re-ran green on the new version (architecture valid,
   spec+lock no findings, 25/25 profiles valid, crew PA043–PA048 clean, acc
@@ -88,6 +80,24 @@ the project stays on 0.x and everything may change.
   enforced. Wired into `docs/index.md` (Getting Started) and cross-linked from
   `docs/agent-providers.md`; fixed a broken `protection.md` anchor link in
   `docs/context-providers.md` found by the link check.
+
+### Fixed
+
+- proagent v0.13.0 graph bugs (patched locally in the installed CLI, original
+  preserved as `specification.js.bak-0.13.0`): PA004 self-edge when the
+  coordinator is also the documenter, and PA007 orphaned agents when the
+  catalog matches more than one member per role. `proagent validate` now
+  reports 0 errors / 0 warnings for the generated architecture.
+- proagent v0.13.0 interview id-collision: derived follow-up questions reuse
+  ids of already-persisted seed questions and are silently dropped (the
+  inputs-outputs probe was lost). Worked around by injecting the question into
+  the session file and answering it through the normal CLI.
+- Stale OpenCode artifacts removed: `opencode.json` (denied rules never
+  applied on Freebuff) deleted; all skill text now names the freebuff harness.
+  Force-push, branch-deletion, and history-rewrite guards remain declared in
+  `proagents.yaml` policies and the AGENTS.md profile rules.
+- Re-ran `proagent resolve` → `lock` → `validate --spec` after the harness
+  change: 3 capabilities resolved, spec+lock validation ok.
 
 ## [0.1.0] - 2026-09-21
 

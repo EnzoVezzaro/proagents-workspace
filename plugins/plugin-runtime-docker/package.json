@@ -1,0 +1,26 @@
+{
+  "name": "@proagents/plugin-runtime-docker",
+  "version": "0.1.0",
+  "description": "Docker runtime capability provider for ProAgents Workspace — isolated container workspaces.",
+  "license": "MIT",
+  "type": "module",
+  "engines": { "node": ">=18" },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": { ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" } },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src",
+    "test": "vitest run",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@proagents/workspace": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
+  }
+}

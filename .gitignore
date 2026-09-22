@@ -1,4 +1,10 @@
+# Agent memory and transient agent state (not source)
 .acc-memory.md
+docs/.acc-memory.md
 .acc/state/rollback/
 .proagent/
-docs/.acc-memory.md
+
+# Dependencies and build output
+node_modules/
+dist/
+coverage/

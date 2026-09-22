@@ -1,0 +1,38 @@
+{
+  "name": "proagents-workspace",
+  "version": "0.1.0",
+  "description": "ProAgents Workspace CLI (`paw`) — the programmable workspace for AI agents. Install globally: npm install -g proagents-workspace",
+  "license": "MIT",
+  "type": "module",
+  "engines": { "node": ">=18" },
+  "bin": {
+    "paw": "./dist/index.js"
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src",
+    "test": "vitest run",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@proagents/contracts": "workspace:*",
+    "@proagents/kernel": "workspace:*",
+    "@proagents/workspace": "workspace:*",
+    "@proagents/plugin-filesystem": "workspace:*",
+    "@proagents/plugin-shell": "workspace:*",
+    "@proagents/plugin-git": "workspace:*",
+    "@proagents/plugin-runtime-local": "workspace:*",
+    "@proagents/plugin-runtime-docker": "workspace:*",
+    "@proagents/plugin-context-acc": "workspace:*",
+    "@proagents/plugin-agent-codex": "workspace:*",
+    "@proagents/plugin-repo-shield": "workspace:*",
+    "zod": "^4.1.5"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
+  }
+}

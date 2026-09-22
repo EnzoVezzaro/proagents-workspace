@@ -1,0 +1,29 @@
+{
+  "name": "proagents-workspace-monorepo",
+  "version": "0.1.0",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "packageManager": "pnpm@10.18.3",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build": "pnpm -r --workspace-concurrency=1 run build",
+    "typecheck": "pnpm -r --workspace-concurrency=1 run typecheck",
+    "lint": "pnpm -r --workspace-concurrency=1 run lint",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "clean": "pnpm -r run clean && rm -rf coverage"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.0",
+    "@proagents/workspace": "workspace:*",
+    "@types/node": "^22.10.0",
+    "@vitest/coverage-v8": "^3.2.4",
+    "eslint": "^9.39.0",
+    "typescript": "^5.9.2",
+    "typescript-eslint": "^8.46.0",
+    "vitest": "^3.2.4"
+  }
+}

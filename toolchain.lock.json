@@ -1,0 +1,10 @@
+{
+  "version": "1.0.0",
+  "$comment": "Lockfile for the workspace implementation itself. The ProAgents engine manages the agent environment via proagents.yaml at the repository root; this file only pins the JS toolchain.",
+  "toolchain": {
+    "node": ">=18",
+    "pnpm": ">=10",
+    "typescript": "^5.9.0",
+    "vitest": "^3.2.0"
+  }
+}
