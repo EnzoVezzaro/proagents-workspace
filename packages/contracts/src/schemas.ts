@@ -40,8 +40,18 @@ export const permissionSchema = z.string().superRefine((value, ctx) => {
 export const pluginManifestSchema = z.object({
   id: z.string().regex(/^[a-z][a-z0-9-]*$/, "plugin id must be kebab-case"),
   name: z.string().min(1),
-  version: semverRangeSchema.or(z.literal("*")).or(z.string().min(1)),
+  /** MUST be a real semver (or `*`); a free-form string silently disables
+   *  the incompatibility gate, so the catch-all arm is not allowed. */
+  version: semverRangeSchema.or(z.literal("*")),
   description: z.string().optional(),
+  /**
+   * The capability provider VALUE this plugin serves (spec section 9
+   * vocabulary), e.g. runtime plugin `local`, context plugin `acc`. The
+   * kernel compares config provider values against this declarative field —
+   * it never maps provider names itself (kernel purity). Falls back to the
+   * plugin id when absent.
+   */
+  provider: z.string().min(1).optional(),
   /** Capability contracts this plugin implements, e.g. ["runtime", "filesystem"]. */
   capabilities: z.array(z.string().min(1)).min(1),
   /** Service or plugin ids this plugin requires to be present. */
@@ -74,7 +84,7 @@ export const networkModeSchema = z.enum([
 ]);
 
 export const workspaceConfigSchema = z.object({
-  workspaceApi: z.string().optional(),
+  workspaceApi: semverRangeSchema.optional(),
   runtime: z.object({
     provider: z.string().min(1),
     image: z.string().optional(),

@@ -14,6 +14,9 @@ import { PluginLoader, type PluginContext, type WorkspacePlugin } from "./plugin
 import { LifecycleStateMachine } from "./lifecycle.js";
 import { StructuredLogger, type Logger } from "./logger.js";
 import { aggregateHealth, type DoctorEntry } from "./health.js";
+import { satisfiesRange } from "./semver.js";
+
+const WORKSPACE_API_VERSION = "1.0.0";
 
 export interface WorkspaceOptions {
   /** Pre-validated config object, or raw YAML/JSON-compatible object to validate. */
@@ -71,6 +74,17 @@ export class Workspace {
       });
     }
     const workspace = new Workspace(parsed.data, options.logSink);
+    // The declared `workspaceApi` range must be satisfiable by this kernel
+    // before anything else runs (spec section 120).
+    if (parsed.data.workspaceApi !== undefined && !satisfiesRange(WORKSPACE_API_VERSION, parsed.data.workspaceApi)) {
+      throw new WorkspaceError({
+        code: "CONFIG_VERSION_UNSUPPORTED",
+        message: `workspace.yaml declares workspaceApi "${parsed.data.workspaceApi}", but this kernel provides ${WORKSPACE_API_VERSION}.`,
+        recoverable: false,
+        suggestions: ["Regenerate the workspace with a matching paw version", "Bump workspaceApi in workspace.yaml"],
+        details: { declared: parsed.data.workspaceApi, supported: WORKSPACE_API_VERSION },
+      });
+    }
     if (options.approvalFlow) {
       (workspace as unknown as { permissions: PermissionFramework }).permissions =
         new PermissionFramework(parsed.data, options.approvalFlow);
@@ -84,16 +98,50 @@ export class Workspace {
   /** Activate all plugins in dependency order. */
   async initialize(): Promise<void> {
     this.lifecycle.transition("initializing");
-    await this.events.emit("workspace/initializing", { workspaceId: this.id });
     try {
+      await this.events.emit("workspace/initializing", { workspaceId: this.id });
       const plan = await this.loader.resolve(this.config);
       for (const plugin of plan) await this.activate(plugin);
       this.lifecycle.transition("ready");
       await this.events.emit("workspace/ready", { workspaceId: this.id });
     } catch (error) {
-      this.lifecycle.transition("error");
-      throw error;
+      await this.fail(error);
     }
+  }
+
+  /**
+   * Unwind a partially-started workspace (spec section 60): deactivate the
+   * plugins that did activate (reverse order), emit `workspace/error`, move to
+   * the `error` state, then rethrow the original failure.
+   */
+  private async fail(error: unknown): Promise<never> {
+    for (const plugin of [...this.plugins].reverse()) {
+      try {
+        await plugin.deactivate?.(this.contexts.get(plugin.manifest.id) as PluginContext);
+      } catch {
+        // teardown must never mask the original failure
+      }
+    }
+    const shape: import("@proagents/contracts").WorkspaceErrorShape =
+      error instanceof WorkspaceError
+        ? error.toJSON()
+        : {
+            code: "INTERNAL_ERROR",
+            message: error instanceof Error ? error.message : String(error),
+            recoverable: false,
+            suggestions: ["Check the workspace logs for the underlying cause"],
+          };
+    try {
+      await this.events.emit("workspace/error", { workspaceId: this.id, error: shape });
+    } catch {
+      // a throwing error-subscriber must not mask the original failure
+    }
+    try {
+      if (this.lifecycle.can("error")) this.lifecycle.transition("error");
+    } catch {
+      // already in a terminal state
+    }
+    throw error;
   }
 
   private async activate(plugin: WorkspacePlugin): Promise<void> {
@@ -125,9 +173,21 @@ export class Workspace {
   }
 
   async shutdown(): Promise<void> {
-    if (this.lifecycle.current === "destroyed") return;
-    if (this.lifecycle.can("stopping")) this.lifecycle.transition("stopping");
-    await this.events.emit("workspace/stopping", { workspaceId: this.id });
+    const state = this.lifecycle.current;
+    // Idempotent teardown: never double-deactivate, never transition out of a
+    // terminal state. A workspace that errored during initialize() was already
+    // unwound by fail().
+    if (state === "destroyed" || state === "stopped" || state === "error" || state === "created") return;
+    try {
+      if (this.lifecycle.can("stopping")) this.lifecycle.transition("stopping");
+    } catch {
+      // tolerate unexpected transitions during teardown
+    }
+    try {
+      await this.events.emit("workspace/stopping", { workspaceId: this.id });
+    } catch {
+      // a throwing stopping-subscriber must not prevent teardown
+    }
     for (const plugin of [...this.plugins].reverse()) {
       try {
         await plugin.deactivate?.(this.contexts.get(plugin.manifest.id) as PluginContext);
@@ -138,8 +198,16 @@ export class Workspace {
         });
       }
     }
-    this.lifecycle.transition("stopped");
-    await this.events.emit("workspace/stopped", { workspaceId: this.id });
+    try {
+      if (this.lifecycle.can("stopped")) this.lifecycle.transition("stopped");
+    } catch {
+      // tolerate unexpected transitions during teardown
+    }
+    try {
+      await this.events.emit("workspace/stopped", { workspaceId: this.id });
+    } catch {
+      // a throwing stopped-subscriber must not prevent teardown
+    }
   }
 
   async doctor(): Promise<DoctorEntry[]> {

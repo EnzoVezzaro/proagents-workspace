@@ -10,11 +10,25 @@ import type { LogRecord, LogSeverity, ObservabilityProvider } from "@proagents/c
 
 const REDACTED_KEYS = new Set([
   "password",
+  "passwd",
   "secret",
   "token",
+  "authtoken",
+  "auth_token",
   "authorization",
   "apikey",
   "api_key",
+  "xapikey",
+  "x_api_key",
+  "accesstoken",
+  "access_token",
+  "clientsecret",
+  "client_secret",
+  "privatekey",
+  "private_key",
+  "credential",
+  "credentials",
+  "bearer",
   "npm_token",
 ]);
 
@@ -55,6 +69,14 @@ export class StructuredLogger implements Logger {
         out[key] = "[redacted]";
       } else if (value !== null && typeof value === "object" && !Array.isArray(value)) {
         out[key] = this.sanitize(value as Record<string, unknown>);
+      } else if (Array.isArray(value)) {
+        // Recurse into arrays too — credentials can hide in nested records.
+        out[key] = value.map((item) => {
+          if (item !== null && typeof item === "object") {
+            return this.sanitize(item as Record<string, unknown>);
+          }
+          return item;
+        });
       } else {
         out[key] = value;
       }

@@ -69,6 +69,7 @@ function guardVerdict(
 export const gitPlugin = definePlugin({
   manifest: {
     id: "git",
+    provider: "git",
     name: "Git Repository",
     version: "0.1.0",
     description: "Guarded git clone/status/commit/push with conservative defaults",
@@ -146,22 +147,27 @@ export const gitPlugin = definePlugin({
       },
 
       async clone(request) {
+        const targetResolved = path.resolve(request.targetPath);
         const args = ["clone"];
         if (request.depth !== undefined) args.push("--depth", String(request.depth));
         if (request.branch !== undefined) args.push("--branch", request.branch);
         args.push(request.repository, request.targetPath);
         await ctx.events.emit("repository/cloning", { provider: "git", repository: request.repository });
+        // A clone writes to disk: protection must veto BEFORE execution
+        // (spec sections 101–102), so the target path runs the same
+        // before-write chain as any filesystem write.
+        await ctx.events.emit("filesystem/before-write", { path: targetResolved, size: 0 });
         // The clone target's parent must exist for git to spawn into it.
-        await fsMkdir(path.dirname(path.resolve(request.targetPath)), { recursive: true });
-        const result = await run(path.dirname(path.resolve(request.targetPath)), args, 120_000);
+        await fsMkdir(path.dirname(targetResolved), { recursive: true });
+        const result = await run(path.dirname(targetResolved), args, 120_000);
         if (result.code !== 0) throw commandError(result.stderr, `git clone failed for ${request.repository}`);
-        const head = await run(request.targetPath, ["rev-parse", "HEAD"], 10_000);
+        const head = await run(targetResolved, ["rev-parse", "HEAD"], 10_000);
         await ctx.events.emit("repository/cloned", {
           provider: "git",
           repository: request.repository,
           commit: head.stdout.trim() || undefined,
         });
-        return { path: path.resolve(request.targetPath), commit: head.stdout.trim() };
+        return { path: targetResolved, commit: head.stdout.trim() };
       },
 
       async status(repoPath) {

@@ -81,16 +81,28 @@ function clientOptions(parsed: ParsedArgs): WorkspaceClientOptions {
             process.stderr.write(
               `Approval required: ${request.operation} on ${request.target} (plugin: ${request.pluginId}). [y/N] `
             );
+            // Interactive prompt that also terminates when stdin ends or
+            // errors (piped/EOF) — an unanswered prompt DENIES, it never hangs.
+            let buf = "";
+            let settled = false;
             const answer = await new Promise<string>((resolve) => {
-              let buf = "";
+              const finish = (value: string) => {
+                if (settled) return;
+                settled = true;
+                process.stdin.removeListener("data", onData);
+                process.stdin.removeListener("end", onEnd);
+                process.stdin.removeListener("error", onError);
+                resolve(value);
+              };
               const onData = (chunk: Buffer) => {
                 buf += chunk.toString("utf8");
-                if (buf.includes("\n")) {
-                  process.stdin.removeListener("data", onData);
-                  resolve(buf.trim());
-                }
+                if (buf.includes("\n")) finish(buf.trim());
               };
+              const onEnd = () => finish(buf.trim());
+              const onError = () => finish("");
               process.stdin.on("data", onData);
+              process.stdin.on("end", onEnd);
+              process.stdin.on("error", onError);
             });
             return answer.toLowerCase() === "y" ? ("approved" as const) : ("denied" as const);
           },
@@ -209,7 +221,7 @@ async function main(): Promise<number> {
 
       default: {
         const payload = {
-          code: "CONFIG_INVALID",
+          code: "COMMAND_NOT_FOUND" as const,
           message: `Unknown command: ${parsed.command}. Run 'paw help'.`,
           recoverable: true,
           suggestions: ["Run `paw help` to list commands"],
@@ -240,6 +252,13 @@ async function main(): Promise<number> {
     await client.stop();
   }
 }
+
+// Interrupts exit with the conventional 130 status and never leave the
+// workspace mid-shutdown waiting on input.
+process.on("SIGINT", () => {
+  process.stderr.write("\ninterrupted\n");
+  process.exit(130);
+});
 
 main()
   .then((code) => process.exit(code))

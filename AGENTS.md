@@ -80,6 +80,7 @@ See `docs/architecture.md` for the full picture and `docs/` for the complete doc
 - See `.acc/config/workflows/new-plugin.md` for creating a plugin package.
 - See `.acc/config/workflows/testing.md` for writing tests (contract, integration, e2e).
 - See `.acc/config/workflows/security-review.md` for the security review gate.
+- See `.acc/config/workflows/agent-coordination.md` for the cross-agent comment channel (`.agents/COMMENTS.md`).
 
 ## Standards
 
@@ -133,11 +134,12 @@ When modifying this repository:
 1. Read this contract, then the functionality-local contract (`docs/AGENTS.md` when editing documentation).
 2. Pick your profile by task type (Agent Profiles above): spec work → spec-editor; docs → documentation-editor; TypeScript/kernel/CLI/SDK → nodejs-engineer; Docker/local runtimes → runtime-engineer; Kubernetes → kubernetes-engineer; E2B/remote/OpenTofu → cloud-infrastructure-engineer; plugins → plugin-engineer; tests → verification-engineer; health/logs/doctor → reliability-engineer; releases/licensing → open-source-maintainer.
 3. Inspect `.acc-memory.md` if present for durable project knowledge.
-4. `README.md` is the canonical spec; `docs/` must never contradict it. When improving docs, sync from the spec and keep cross-links valid (see `.acc/config/standards/documentation.md`).
-5. Preserve the invariants in Constraints — especially the kernel purity rule (section 139 of the spec).
-6. Validate after changes: `acc check` for contract integrity, and verify every Markdown link in `docs/` resolves. Code changes additionally require `pnpm lint && pnpm typecheck && pnpm test && pnpm build`.
-7. Record durable lessons in `.acc-memory.md` (use `acc memory add .`); record interruptions and corrections under "Interrupts & Corrections".
-8. The CLI is `paw` (package `proagents-workspace`) — keep command examples consistent across all documents.
+4. Check `.agents/COMMENTS.md` (the shared cross-agent comment channel — currently Freebuff and OpenCode) before starting work and before ending your session; leave an entry when handing off, deciding, or blocking. Append-only: never edit or delete another agent's entry (see `.acc/config/workflows/agent-coordination.md`).
+5. `README.md` is the canonical spec; `docs/` must never contradict it. When improving docs, sync from the spec and keep cross-links valid (see `.acc/config/standards/documentation.md`).
+6. Preserve the invariants in Constraints — especially the kernel purity rule (section 139 of the spec).
+7. Validate after changes: `acc check` for contract integrity, and verify every Markdown link in `docs/` resolves. Code changes additionally require `pnpm lint && pnpm typecheck && pnpm test && pnpm build`.
+8. Record durable lessons in `.acc-memory.md` (use `acc memory add .`); record interruptions and corrections under "Interrupts & Corrections".
+9. The CLI is `paw` (package `proagents-workspace`) — keep command examples consistent across all documents.
 
 <!-- proagent:profile:start edaa05e1adb0 -->
 # Professional Profile: Staff Engineer + Security Engineer + Technical Writer + Backend Engineer + DevOps Engineer + QA Engineer + Site Reliability Engineer + Release Engineer

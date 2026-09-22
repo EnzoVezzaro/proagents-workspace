@@ -45,6 +45,8 @@ export class ServiceRegistry {
       implementation: implementation as unknown,
       pluginId,
     });
+    // Registration order matters across plugins; never serve a stale snapshot.
+    this.byCapabilityCache = undefined;
   }
 
   has(definition: ServiceDefinition<unknown>): boolean {

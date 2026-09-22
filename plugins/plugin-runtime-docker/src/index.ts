@@ -59,6 +59,7 @@ interface DockerHandle extends RuntimeWorkspaceHandle {
 export const dockerRuntimePlugin = definePlugin({
   manifest: {
     id: "runtime-docker",
+    provider: "docker",
     name: "Docker Runtime",
     version: "0.1.0",
     description: "Isolated container workspace runtime backed by the docker CLI",
@@ -101,7 +102,10 @@ export const dockerRuntimePlugin = definePlugin({
           "--security-opt", "no-new-privileges",
         ];
         const networkMode = ctx.config.network?.mode;
-        if (networkMode === "offline") args.push("--network", "none");
+        // Least privilege (spec sections 60, 34): `restricted` and `offline`
+        // both mean the container gets no network — the plugin cannot enforce
+        // a host allowlist, so any egress it allows would be unbounded.
+        if (networkMode === "offline" || networkMode === "restricted") args.push("--network", "none");
         args.push(image, "sleep", "infinity");
         const result = await docker(args, 120_000);
         if (result.code !== 0) {

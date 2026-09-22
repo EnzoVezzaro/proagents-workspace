@@ -98,6 +98,38 @@ describe("repo-shield protection plugin", () => {
     expect(decision.action).toBe("block");
   });
 
+  // Regression: the old regexes only caught a narrow spelling of each
+  // destructive operation — short flags, `git -C` prefixes and mixed case all
+  // slipped through.
+  it.each([
+    "git push -f origin main",
+    "GIT PUSH --force origin main",
+    "git -C /workspace/repo push --force",
+    "git   push   -f  origin main",
+    "git push origin --delete feature",
+    "git push -d origin feature",
+    "git clean -df",
+    "git branch --delete feature",
+    "git tag --delete v1.0.0",
+    "git reset -q --hard HEAD",
+  ])("blocks obfuscated destructive command: %s", async (command) => {
+    const h = makeCtx();
+    const provider = h.provider();
+    const decision = await provider.evaluate({ operation: "command", target: command });
+    expect(decision.action).toBe("block");
+  });
+
+  it("blocks force push hiding in the details.command field", async () => {
+    const h = makeCtx();
+    const provider = h.provider();
+    const decision = await provider.evaluate({
+      operation: "command",
+      target: "git push origin main",
+      details: { command: "git push -f origin main" },
+    });
+    expect(decision.action).toBe("block");
+  });
+
   it.each([
     "pnpm test",
     "git status",
@@ -118,6 +150,14 @@ describe("repo-shield protection plugin", () => {
     expect((await provider.evaluate({ operation: "filesystem.write", target: "/workspace/repo/src/index.ts" })).action).toBe("allow");
   });
 
+  it("blocks .envrc writes and nested .git directories", async () => {
+    const h = makeCtx();
+    const provider = h.provider();
+    expect((await provider.evaluate({ operation: "filesystem.write", target: "/workspace/repo/.envrc" })).action).toBe("block");
+    expect((await provider.evaluate({ operation: "filesystem.write", target: "/workspace/repo/vendor/pkg/.git/HEAD" })).action).toBe("block");
+    expect((await provider.evaluate({ operation: "filesystem.write", target: "/workspace/repo/src/.gitignore" })).action).toBe("allow");
+  });
+
   it("requires approval for network egress", async () => {
     const h = makeCtx();
     const provider = h.provider();
@@ -130,6 +170,16 @@ describe("repo-shield protection plugin", () => {
     h.provider(); // activate subscribers
     await expect(h.before({ command: "git push --force origin main" })).rejects.toThrow(/PROTECTION_BLOCKED/);
     expect(h.interventions.length).toBe(1);
+  });
+
+  it("veto chain: the veto is a structured WorkspaceError (PROTECTION_BLOCKED)", async () => {
+    const h = makeCtx();
+    h.provider();
+    const error = await h.before({ command: "git push -f origin main" }).then(() => null, (e: unknown) => e);
+    expect(error).toBeInstanceOf(Error);
+    const shaped = error as { code?: string; message?: string };
+    expect(shaped.code).toBe("PROTECTION_BLOCKED");
+    expect(shaped.message).toContain("PROTECTION_BLOCKED");
   });
 
   it("veto chain: safe commands pass through without intervention", async () => {

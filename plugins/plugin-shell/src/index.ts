@@ -15,12 +15,20 @@ const shellDefinition = defineService<ShellProvider>({
   requiredPermissions: ["shell"],
 });
 
-/** Commands that always count as dangerous for approval mode `guarded`. */
-const DANGEROUS = /\b(rm\s+-[rf]|sudo|curl|\|\s*sh|shutdown|mkfs|dd\s+if=)/;
+/**
+ * Commands that always count as dangerous for approval mode `guarded`.
+ * Network egress, privileged actions, destructive filesystem operations and
+ * eval-style remote code make the operation go through human approval
+ * (headless then fails closed). `curl`/`git push --force` are NOT caught here
+ * by design — they are blocked outright by the repo-shield protection layer.
+ */
+const DANGEROUS =
+  /\b(rm\s+-[rf]|sudo|curl|wget|nc|ncat|ssh|scp|sftp|telnet|ftp|node\s+-[ep]\b|python\S*\s+-c\b|\|\s*sh|shutdown|reboot|mkfs|dd\s+if=)/;
 
 export const shellPlugin = definePlugin({
   manifest: {
     id: "shell",
+    provider: "shell",
     name: "Shell",
     version: "0.1.0",
     description: "Permission-checked shell command execution",

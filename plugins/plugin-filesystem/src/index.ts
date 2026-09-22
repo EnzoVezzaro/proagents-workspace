@@ -35,6 +35,7 @@ function resolveWithin(root: string, target: string, mode: "read" | "write"): st
 export const filesystemPlugin = definePlugin({
   manifest: {
     id: "filesystem",
+    provider: "filesystem",
     name: "Filesystem",
     version: "0.1.0",
     description: "Sandboxed filesystem operations inside the workspace",
@@ -104,6 +105,9 @@ export const filesystemPlugin = definePlugin({
       async remove(request) {
         ctx.permissions.require({ pluginId: "filesystem", category: `filesystem:write:${root}`, target: request.path });
         const resolved = resolveWithin(root, request.path, "write");
+        // Deletion is also a write: protection must veto BEFORE it executes,
+        // or removing `.git`/`.env`/`paw-lock.json` would bypass Repo Shield.
+        await ctx.events.emit("filesystem/before-write", { path: resolved, size: 0 });
         await fs.rm(resolved, { recursive: request.recursive ?? false });
       },
     };

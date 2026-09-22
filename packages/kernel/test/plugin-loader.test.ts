@@ -72,4 +72,72 @@ describe("PluginLoader", () => {
       loader.resolve(configWith([{ id: "nope" }]) as never)
     ).rejects.toMatchObject({ code: "PLUGIN_LOAD_FAILED" });
   });
+
+  it("activates bundled (implicit) plugins whose provider value the config references", async () => {
+    // The defect regression: a catalog plugin declaring provider: "local"
+    // must be pulled in by runtime.provider: "local" — previously config
+    // provider values ("local") were compared to plugin ids ("runtime-local").
+    const loader = new PluginLoader();
+    const activated: string[] = [];
+    loader.add("runtime-local", () =>
+      plugin({ id: "runtime-local", provider: "local", capabilities: ["runtime"] }, activated), { implicit: true });
+    loader.add("filesystem", () =>
+      plugin({ id: "filesystem", provider: "filesystem", capabilities: ["filesystem"] }, activated), { implicit: true });
+    loader.add("shell", () =>
+      plugin({ id: "shell", provider: "shell", capabilities: ["shell"] }, activated), { implicit: true });
+    const plan = await loader.resolve({
+      runtime: { provider: "local" },
+      repository: undefined,
+      tools: ["shell", "filesystem"],
+    } as never);
+    // resolve() builds the activation plan; activation itself is the
+    // Workspace's job — a matching provider value is enough to select it.
+    expect(plan.map((p) => p.manifest.id).sort()).toEqual(["filesystem", "runtime-local", "shell"]);
+  });
+
+  it("does not activate bundled plugins the config does not reference", async () => {
+    const loader = new PluginLoader();
+    loader.add("repo-shield", () => plugin({ id: "repo-shield", provider: "repo-shield", capabilities: ["protection"] }), { implicit: true });
+    const plan = await loader.resolve({
+      runtime: { provider: "local" },
+      repository: undefined,
+      tools: [],
+    } as never);
+    expect(plan.map((p) => p.manifest.id)).toEqual([]);
+  });
+
+  it("defaults the provider value to the plugin id when absent", async () => {
+    const loader = new PluginLoader();
+    const activated: string[] = [];
+    // Legacy plugin without a provider field is referenced by its id.
+    loader.add("legacy-runtime", () => plugin({ id: "legacy-runtime", capabilities: ["runtime"] }, activated), { implicit: true });
+    const plan = await loader.resolve({
+      runtime: { provider: "legacy-runtime" },
+      repository: undefined,
+      tools: [],
+    } as never);
+    expect(plan.map((p) => p.manifest.id)).toEqual(["legacy-runtime"]);
+  });
+
+  it("skips bundled plugins with an invalid manifest instead of crashing the workspace", async () => {
+    const loader = new PluginLoader();
+    const bad = { ...plugin({ id: "broken" }), manifest: { id: "broken", name: "broken" } as PluginManifest };
+    loader.add("broken", () => bad, { implicit: true });
+    loader.add("good", () => plugin({ id: "good", capabilities: ["tool"] }, []), { implicit: true });
+    const plan = await loader.resolve({
+      runtime: { provider: "local" },
+      repository: undefined,
+      tools: ["tool"],
+    } as never);
+    expect(plan.map((p) => p.manifest.id)).toEqual(["good"]);
+  });
+
+  it("still fails explicitly declared plugins with an invalid manifest", async () => {
+    const loader = new PluginLoader();
+    const bad = { ...plugin({ id: "broken" }), manifest: { id: "broken", name: "broken" } as PluginManifest };
+    loader.add("broken", () => bad);
+    await expect(
+      loader.resolve(configWith([{ id: "broken" }]) as never)
+    ).rejects.toMatchObject({ code: "PLUGIN_MANIFEST_INVALID" });
+  });
 });

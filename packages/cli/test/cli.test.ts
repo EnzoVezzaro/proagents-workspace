@@ -53,7 +53,9 @@ describe("paw CLI (e2e)", () => {
     expect(r.code).toBe(0);
     const parsed = JSON.parse(r.stdout) as { plugins: { id: string; capabilities: string[] }[] };
     const ids = parsed.plugins.map((p) => p.id).sort();
-    expect(ids).toEqual(["filesystem", "shell"]);
+    // runtime.provider: "local" now correctly selects the runtime-local
+    // plugin (config provider values match the manifest `provider` field).
+    expect(ids).toEqual(["filesystem", "runtime-local", "shell"]);
     const caps = parsed.plugins.flatMap((p) => p.capabilities);
     expect(caps).toContain("filesystem");
     expect(caps).toContain("shell");
@@ -80,7 +82,7 @@ describe("paw CLI (e2e)", () => {
       entries: { pluginId: string; health: { status: string; message: string } }[];
     };
     const ids = parsed.entries.map((e) => e.pluginId).sort();
-    expect(ids).toEqual(["filesystem", "shell"]);
+    expect(ids).toEqual(["filesystem", "runtime-local", "shell"]);
     for (const entry of parsed.entries) {
       expect(["healthy", "degraded", "unavailable"]).toContain(entry.health.status);
       expect(entry.health.message.length).toBeGreaterThan(0);
@@ -107,7 +109,7 @@ describe("paw CLI (e2e)", () => {
     const r = await paw(["frobnicate"]);
     expect(r.code).toBe(2);
     const parsed = JSON.parse(r.stderr) as { code: string; message: string };
-    expect(parsed.code).toBe("CONFIG_INVALID");
+    expect(parsed.code).toBe("COMMAND_NOT_FOUND");
     expect(parsed.message).toContain("frobnicate");
   });
 });

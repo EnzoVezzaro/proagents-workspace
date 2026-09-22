@@ -28,6 +28,7 @@ interface IndexedEntry {
 export const accContextPlugin = definePlugin({
   manifest: {
     id: "context-acc",
+    provider: "acc",
     name: "ACC Context",
     version: "0.1.0",
     description: "Indexes .acc/ context packs and serves ranked context queries",

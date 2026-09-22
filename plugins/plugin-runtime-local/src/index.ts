@@ -10,6 +10,7 @@
  */
 import { definePlugin, WorkspaceError, defineService } from "@proagents/workspace";
 import { spawn } from "node:child_process";
+import { promises as fsp } from "node:fs";
 import path from "node:path";
 import type {
   ProviderHealth,
@@ -40,20 +41,42 @@ function exec(
     });
     let stdout = "";
     let stderr = "";
+    // The limit mirrors the shell/git providers, but SILENT truncation would
+    // report a successful run with half the output — reject instead, so the
+    // caller can never mistake a truncated result for the full one.
+    const LIMIT = 16 * 1024 * 1024;
+    let overflow: "stdout" | "stderr" | undefined;
     child.stdout?.on("data", (d: Buffer) => {
-      if (stdout.length < 16 * 1024 * 1024) stdout += d.toString("utf8");
+      if (overflow !== undefined) return;
+      if (stdout.length + d.length > LIMIT) {
+        overflow = "stdout";
+        return;
+      }
+      stdout += d.toString("utf8");
     });
     child.stderr?.on("data", (d: Buffer) => {
-      if (stderr.length < 16 * 1024 * 1024) stderr += d.toString("utf8");
+      if (overflow !== undefined) return;
+      if (stderr.length + d.length > LIMIT) {
+        overflow = "stderr";
+        return;
+      }
+      stderr += d.toString("utf8");
     });
     child.on("error", reject);
-    child.on("close", (code) => resolve({ code: code ?? 1, stdout, stderr }));
+    child.on("close", (code) => {
+      if (overflow !== undefined) {
+        reject(new Error(`command output on ${overflow} exceeded ${LIMIT} bytes and was rejected (never silently truncated)`));
+        return;
+      }
+      resolve({ code: code ?? 1, stdout, stderr });
+    });
   });
 }
 
 export const localRuntimePlugin = definePlugin({
   manifest: {
     id: "runtime-local",
+    provider: "local",
     name: "Local Runtime",
     version: "0.1.0",
     description: "Zero-cloud local execution runtime (not a sandbox — honestly reported)",
@@ -69,13 +92,27 @@ export const localRuntimePlugin = definePlugin({
       name: "runtime-local",
       contractVersion: "1.0.0",
       health: async (): Promise<ProviderHealth> => {
-        const probe = await exec(["node", "--version"], root, undefined, 10_000);
+        // A missing root would fail the probe with ENOENT and be reported
+        // "unavailable" — but the HOST runtime still works; the root just
+        // does not exist yet. Probe from the process cwd and degrade.
+        let rootExists = true;
+        try {
+          await fsp.stat(root);
+        } catch {
+          rootExists = false;
+        }
+        const probe = await exec(["node", "--version"], rootExists ? root : process.cwd(), undefined, 10_000);
+        if (probe.code !== 0) {
+          return {
+            status: "degraded",
+            message: `host probe failed: ${probe.stderr.trim()}`,
+          };
+        }
         return {
-          status: probe.code === 0 ? "healthy" : "degraded",
-          message:
-            probe.code === 0
-              ? `local runtime ready (NOT a sandbox: commands run on the host as the current user)`
-              : `host probe failed: ${probe.stderr.trim()}`,
+          status: rootExists ? "healthy" : "degraded",
+          message: rootExists
+            ? `local runtime ready (NOT a sandbox: commands run on the host as the current user)`
+            : `local runtime works, but root ${root} does not exist yet (NOT a sandbox: commands run on the host as the current user)`,
         };
       },
 

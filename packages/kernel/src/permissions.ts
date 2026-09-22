@@ -65,6 +65,17 @@ export class HeadlessApprovalFlow implements ApprovalFlow {
   }
 }
 
+/** Is `target` contained within the granted `scope`? Relative targets resolve
+ *  under the granted root by construction — parent-traversal ("..") is the
+ *  provider's own sandbox guard (FILESYSTEM_PATH_DENIED). Absolute targets
+ *  must lie strictly inside the granted scope. */
+function targetWithin(scope: string, target: string): boolean {
+  if (scope === "/") return true;
+  if (!target.startsWith("/")) return true;
+  if (target === scope) return true;
+  return target.startsWith(scope.endsWith("/") ? scope : `${scope}/`);
+}
+
 export class PermissionFramework {
   private readonly grants = new Map<string, Set<string>>();
   private readonly config: WorkspaceConfig;
@@ -91,26 +102,38 @@ export class PermissionFramework {
    * filesystem plugin computing its effective root from plugin options.
    * The refined request is intersected with the configuration again, so a
    * plugin can never self-grant beyond what workspace.yaml allows
-   * (spec section 59).
+   * (spec section 59). Contrary to the initial grant, refinement MERGES with
+   * the manifest-level grants instead of replacing them.
    */
   refinePlugin(pluginId: string, requested: readonly string[]): void {
-    this.grantPlugin(pluginId, requested);
+    const merged = new Set(this.grants.get(pluginId) ?? []);
+    for (const permission of requested) {
+      if (this.isConfigGranted(permission)) merged.add(permission);
+    }
+    this.grants.set(pluginId, merged);
   }
 
   private isConfigGranted(permission: string): boolean {
     // Category-level permissions are granted by config sections; scoped
     // filesystem/secret permissions are granted by their config lists.
-    if (permission === "network") return this.config.network?.mode !== "offline";
+    // `network` is only granted when the configuration explicitly declares a
+    // network section — an absent section means no network by default.
+    if (permission === "network") return this.config.network?.mode !== undefined && this.config.network.mode !== "offline";
     if (permission === "secrets") return (this.config.permissions?.secrets?.allowed?.length ?? 0) > 0;
     if (permission === "shell" || permission === "terminal") return true;
     if (permission === "browser") return (this.config.tools ?? []).includes("browser");
     if (permission === "repository") return this.config.repository !== undefined;
     const fs = /^filesystem:(read|write):(.+)$/.exec(permission);
     if (fs) {
+      const scope = fs[2] as string;
       const list = fs[1] === "read"
         ? (this.config.permissions?.filesystem?.read ?? [])
         : (this.config.permissions?.filesystem?.write ?? []);
-      return list.some((allowed) => permission.endsWith(allowed) || allowed === "/");
+      // The requested SCOPE must be INSIDE a granted scope — never a suffix
+      // match: granting /workspace/repo must not cover /etc/workspace/repo.
+      // The scope `list` items are the granted prefixes; we must only grant
+      // when the requested scope is a child of (or exactly) a granted prefix.
+      return list.some((allowed) => allowed === "/" || scope === allowed || scope.startsWith(allowed.endsWith("/") ? allowed : `${allowed}/`));
     }
     const secret = /^secrets:(.+)$/.exec(permission);
     if (secret) {
@@ -137,12 +160,25 @@ export class PermissionFramework {
   }
 
   private matches(granted: Set<string>, request: PermissionRequest): boolean {
-    if (granted.has(request.category)) return true;
+    if (granted.has(request.category)) {
+      // A scoped filesystem grant is still containment-checked against an
+      // absolute target: granting /workspace/repo must not cover
+      // /workspace/repository even when the exact category matches.
+      if (request.target !== undefined) {
+        const scoped = /^filesystem:(?:read|write):(.+)$/.exec(request.category);
+        if (scoped !== null) return targetWithin(scoped[1] as string, request.target);
+      }
+      return true;
+    }
     if (request.target === undefined) return false;
     for (const g of granted) {
-      const scoped = /^(filesystem:(?:read|write)|secrets):(.+)$/.exec(g);
-      const prefix = scoped?.[2];
-      if (scoped && prefix !== undefined && request.target.startsWith(prefix)) return true;
+      const filesystem = /^filesystem:(read|write):(.+)$/.exec(g);
+      if (filesystem) {
+        if (targetWithin(filesystem[2] as string, request.target)) return true;
+        continue;
+      }
+      const secret = /^secrets:(.+)$/.exec(g);
+      if (secret && secret[1] !== undefined && request.target === secret[1]) return true;
     }
     return false;
   }

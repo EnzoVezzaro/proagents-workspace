@@ -23,6 +23,35 @@ describe("StructuredLogger", () => {
     expect(record.nested.apiKey).toBe("[redacted]");
   });
 
+  it("redacts additional credential field names", () => {
+    const records: unknown[] = [];
+    const logger = new StructuredLogger([(r) => records.push(r)]);
+    logger.info("credentials", {
+      accessToken: "a",
+      access_token: "b",
+      clientSecret: "c",
+      privateKey: "d",
+      bearer: "e",
+      Authorization: "f",
+    });
+    const record = records[0] as Record<string, string>;
+    expect(record.accessToken).toBe("[redacted]");
+    expect(record.access_token).toBe("[redacted]");
+    expect(record.clientSecret).toBe("[redacted]");
+    expect(record.privateKey).toBe("[redacted]");
+    expect(record.bearer).toBe("[redacted]");
+    expect(record.Authorization).toBe("[redacted]");
+  });
+
+  it("redacts credentials nested inside arrays", () => {
+    const records: unknown[] = [];
+    const logger = new StructuredLogger([(r) => records.push(r)]);
+    logger.info("batch", { items: [{ id: 1, token: "supersecret" }, { id: 2 }] });
+    const record = records[0] as { items: { id: number; token?: string }[] };
+    expect(record.items[0]?.token).toBe("[redacted]");
+    expect(record.items[1]).toEqual({ id: 2 });
+  });
+
   it("child loggers carry provider/session bindings", () => {
     const records: unknown[] = [];
     const logger = new StructuredLogger([(r) => records.push(r)]);

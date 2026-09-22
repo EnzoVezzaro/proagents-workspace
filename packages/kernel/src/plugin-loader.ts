@@ -99,6 +99,9 @@ export class PluginLoader {
       try {
         plugin = await candidate.load();
       } catch (error) {
+        // A faulty bundled (implicit) plugin must not break the workspace
+        // (spec section 61); explicitly declared plugins still fail loudly.
+        if (candidate.implicit === true) continue;
         if (error instanceof WorkspaceError) throw error;
         throw new WorkspaceError({
           code: "PLUGIN_LOAD_FAILED",
@@ -107,7 +110,19 @@ export class PluginLoader {
           suggestions: ["Check the plugin installation", "Run `paw doctor` for details"],
         });
       }
-      const manifest = pluginManifestSchema.parse(plugin.manifest);
+      // Validate the manifest before referencing it (spec section 119).
+      let manifest: PluginManifest;
+      try {
+        manifest = pluginManifestSchema.parse(plugin.manifest);
+      } catch (error) {
+        if (candidate.implicit === true) continue;
+        throw new WorkspaceError({
+          code: "PLUGIN_MANIFEST_INVALID",
+          message: `Plugin "${candidate.source}" has an invalid manifest: ${error instanceof Error ? error.message : String(error)}`,
+          recoverable: false,
+          suggestions: ["Fix the plugin manifest to satisfy pluginManifestSchema", "Update the plugin to a version this workspace supports"],
+        });
+      }
       if (candidate.implicit === true && !this.referencedByConfig(manifest, config)) {
         continue; // bundled plugin not referenced by this workspace configuration
       }
@@ -179,16 +194,26 @@ export class PluginLoader {
     return order.map((id) => loaded.get(id) as WorkspacePlugin);
   }
 
-  /** Does the configuration reference this plugin (by id or capability)? */
+  /**
+   * Does the configuration reference this plugin? Provider values in
+   * workspace.yaml (e.g. `runtime.provider: "local"`) are compared against
+   * the declarative `provider` on the manifest (falling back to the plugin
+   * id), so plugin ids and provider vocabulary both work — the kernel never
+   * maps provider names itself (spec section 139).
+   */
   private referencedByConfig(manifest: PluginManifest, config: WorkspaceConfig): boolean {
+    const provider = manifest.provider ?? manifest.id;
     if ((config.plugins ?? []).some((p) => p.id === manifest.id)) return true;
-    if (config.runtime.provider === manifest.id) return true;
-    if (config.repository?.provider === manifest.id) return true;
-    if (config.agent?.provider === manifest.id) return true;
-    if ((config.context?.providers ?? []).includes(manifest.id)) return true;
-    if (config.protection?.provider === manifest.id) return true;
-    if (config.distribution?.provider === manifest.id) return true;
-    // Tools select capability plugins: e.g. tools: [shell, filesystem]
+    if (config.runtime.provider === manifest.id || config.runtime.provider === provider) return true;
+    if (config.repository?.provider === manifest.id || config.repository?.provider === provider) return true;
+    if (config.agent?.provider === manifest.id || config.agent?.provider === provider) return true;
+    if ((config.context?.providers ?? []).some((p) => p === manifest.id || p === provider)) return true;
+    if (config.protection?.provider === manifest.id || config.protection?.provider === provider) return true;
+    if (config.distribution?.provider === manifest.id || config.distribution?.provider === provider) return true;
+    // Tools select capability plugins: e.g. tools: [shell, filesystem].
+    // Tools match CAPABILITY ids, not provider vocabulary — the config's
+    // `tools: [git]` is a capability hint, and the git plugin declares
+    // capability `repository`.
     const tools = new Set(config.tools ?? []);
     if (manifest.capabilities.some((c) => tools.has(c))) return true;
     return false;

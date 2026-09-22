@@ -112,4 +112,103 @@ describe("Workspace", () => {
     await ws.shutdown();
     expect(order).toEqual(["activate:b", "activate:a", "deactivate:a", "deactivate:b"]);
   });
+
+  it("rejects an unsatisfiable declared workspaceApi (CONFIG_VERSION_UNSUPPORTED)", async () => {
+    await expect(
+      Workspace.create({ config: { ...workspaceConfig(), workspaceApi: "^2.0.0" } }, [])
+    ).rejects.toMatchObject({ code: "CONFIG_VERSION_UNSUPPORTED" });
+  });
+
+  it("accepts a satisfiable declared workspaceApi", async () => {
+    const { factory } = fakeRuntimePlugin();
+    const ws = await Workspace.create({ config: { ...workspaceConfig(), workspaceApi: "^1.0.0" } }, [factory]);
+    await ws.initialize();
+    expect(ws.lifecycle.current).toBe("ready");
+  });
+
+  it("unwinds already-activated plugins when a later activation fails (spec section 60)", async () => {
+    const order: string[] = [];
+    const ok = (id: string): DiscoveredFactory => ({
+      source: id,
+      load: () => ({
+        manifest: {
+          id,
+          name: id,
+          version: "0.1.0",
+          capabilities: ["tool"],
+          dependencies: [],
+          permissions: [],
+          compatibility: {},
+        },
+        activate() {
+          order.push(`activate:${id}`);
+        },
+        deactivate() {
+          order.push(`deactivate:${id}`);
+        },
+      }),
+    });
+    const boom: DiscoveredFactory = {
+      source: "boom",
+      load: () => ({
+        manifest: {
+          id: "boom",
+          name: "boom",
+          version: "0.1.0",
+          capabilities: ["tool"],
+          dependencies: [],
+          permissions: [],
+          compatibility: {},
+        },
+        activate() {
+          order.push("activate:boom");
+          throw new Error("activation exploded");
+        },
+      }),
+    };
+    const ws = await Workspace.create(
+      { config: { runtime: { provider: "local" }, plugins: [{ id: "a" }, { id: "boom" }] } },
+      [ok("a"), boom]
+    );
+    const errors: unknown[] = [];
+    ws.events.on("workspace/error", (p) => errors.push(p));
+    await expect(ws.initialize()).rejects.toThrow("activation exploded");
+    // The surviving plugin was deactivated in reverse order.
+    expect(order).toEqual(["activate:a", "activate:boom", "deactivate:a"]);
+    expect(ws.lifecycle.current).toBe("error");
+    expect(errors).toHaveLength(1);
+    // shutdown() after a failed initialize() is a safe no-op.
+    await expect(ws.shutdown()).resolves.toBeUndefined();
+  });
+
+  it("shutdown() is idempotent and never double-deactivates", async () => {
+    let deactivated = 0;
+    const factory: DiscoveredFactory = {
+      source: "local",
+      load: () => ({
+        manifest: {
+          id: "local",
+          name: "local",
+          version: "0.1.0",
+          capabilities: ["tool"],
+          dependencies: [],
+          permissions: [],
+          compatibility: {},
+        },
+        activate() {},
+        deactivate() {
+          deactivated += 1;
+        },
+      }),
+    };
+    const ws = await Workspace.create(
+      { config: { runtime: { provider: "local" }, plugins: [{ id: "local" }] } },
+      [factory]
+    );
+    await ws.initialize();
+    await ws.shutdown();
+    await ws.shutdown();
+    expect(deactivated).toBe(1);
+    expect(ws.lifecycle.current).toBe("stopped");
+  });
 });

@@ -7,9 +7,8 @@
  * It also registers the Protection capability so other code can evaluate
  * operations ahead of time via `services.get(protectionDefinition)`.
  */
-import { definePlugin, defineService } from "@proagents/workspace";
+import { definePlugin, defineService, WorkspaceError } from "@proagents/workspace";
 import type {
-  ProtectionAction,
   ProtectionDecision,
   ProtectionProvider,
   ProtectionRequest,
@@ -22,39 +21,55 @@ const repoShieldDefinition = defineService<ProtectionProvider>({
   requiredPermissions: [],
 });
 
+/**
+ * Canonicalize a command/path for matching: lowercase and collapse runs of
+ * whitespace, so `GIT PUSH --force`, `git   push  -f` and `git -C <dir>
+ * PUSH -f` are all caught. Lowercasing only affects pattern matching, never
+ * the operation itself.
+ */
+const normalize = (s: string): string => s.toLowerCase().replace(/\s+/g, " ").trim();
+
 /** Shell commands whose very presence is destructive. */
 const DESTRUCTIVE_COMMAND_PATTERNS: readonly { pattern: RegExp; reason: string }[] = [
-  { pattern: /\bgit\s+push\b.*--force\b/, reason: "force push rewrites remote history" },
-  { pattern: /\bgit\s+reset\s+--hard\b/, reason: "hard reset discards working-tree changes" },
-  { pattern: /\bgit\s+clean\s+-fd\b/, reason: "clean -fd deletes untracked files" },
-  { pattern: /\bgit\s+branch\s+-[dD]\b/, reason: "branch deletion can lose commits" },
-  { pattern: /\bgit\s+tag\s+-d\b/, reason: "tag deletion can lose release markers" },
-  { pattern: /\bgit\s+rebase\b/, reason: "rebase rewrites history" },
-  { pattern: /\brm\s+-rf\s+\/(?!tmp\b)/, reason: "recursive delete at filesystem root" },
+  { pattern: /^git(?: -c \S+)* push\b.*(?:\s-f\b|--force(?:-with-lease)?\b)/, reason: "force push rewrites remote history" },
+  { pattern: /^git(?: -c \S+)* push\b.*(?:\s-d\b|--delete\b)/, reason: "deleting a remote ref rewrites history" },
+  { pattern: /^git(?: -c \S+)* reset\b.*\s--hard\b/, reason: "hard reset discards working-tree changes" },
+  { pattern: /^git(?: -c \S+)* clean\b.*\s-[dxf]{1,3}\b/, reason: "clean -f deletes untracked files" },
+  { pattern: /^git(?: -c \S+)* branch\b.*(?:\s-[dD]\b|--delete\b)/, reason: "branch deletion can lose commits" },
+  { pattern: /^git(?: -c \S+)* tag\b.*(?:\s-[dD]\b|--delete\b)/, reason: "tag deletion can lose release markers" },
+  { pattern: /^git(?: -c \S+)* rebase\b/, reason: "rebase rewrites history" },
+  { pattern: /\brm -rf \/(?!tmp\b)/, reason: "recursive delete at filesystem root" },
   { pattern: /\b(mkfs|shutdown|reboot)\b/, reason: "host-level destructive command" },
 ];
 
 /** Paths protection never lets plugins write. */
 const PROTECTED_PATHS: readonly { pattern: RegExp; reason: string }[] = [
-  { pattern: /\.git/, reason: "direct .git manipulation bypasses the repository provider" },
-  { pattern: /\.env($|\.)/, reason: "credential files must change through the secrets provider" },
+  { pattern: /(^|\/)\.git(\/|$)/, reason: "direct .git manipulation bypasses the repository provider" },
+  { pattern: /(^|\/)\.env(rc)?(\/|$|\.)/, reason: "credential files must change through the secrets provider" },
   { pattern: /(^|\/)paw-lock\.json$/, reason: "the lockfile is kernel-owned" },
 ];
 
 function evaluate(request: ProtectionRequest): ProtectionDecision {
   const op = request.operation.toLowerCase();
+  const haystack = [
+    request.target,
+    String(request.details?.["command"] ?? ""),
+  ]
+    .filter((s): s is string => typeof s === "string" && s.length > 0)
+    .map(normalize)
+    .join(" ");
 
   for (const rule of DESTRUCTIVE_COMMAND_PATTERNS) {
-    if (rule.pattern.test(request.target) || rule.pattern.test(String(request.details?.["command"] ?? ""))) {
+    if (rule.pattern.test(haystack)) {
       return {
-        action: op === "protection.evaluate" ? "block" : "block",
+        action: "block",
         reason: `blocked: ${rule.reason} (spec section 35)`,
       };
     }
   }
   if (op.startsWith("filesystem")) {
     for (const rule of PROTECTED_PATHS) {
-      if (rule.pattern.test(request.target)) {
+      if (rule.pattern.test(normalize(request.target))) {
         return { action: "block", reason: `blocked: ${rule.reason}` };
       }
     }
@@ -68,6 +83,7 @@ function evaluate(request: ProtectionRequest): ProtectionDecision {
 export const repoShieldPlugin = definePlugin({
   manifest: {
     id: "repo-shield",
+    provider: "repo-shield",
     name: "Repo Shield",
     version: "0.1.0",
     description: "Protection layer that vetoes destructive operations before they execute",
@@ -93,34 +109,48 @@ export const repoShieldPlugin = definePlugin({
 
     // Before-execution veto chain: the kernel event bus awaits subscribers,
     // so throwing here blocks the operation BEFORE it runs (spec 101–102).
-    ctx.events.on("command/before", (payload) => {
+    ctx.events.on("command/before", async (payload) => {
       const decision = evaluate({
         operation: "command",
         target: payload.command,
       });
       if (decision.action === "block") {
-        void ctx.events.emit("protection/intervened", {
+        await ctx.events.emit("protection/intervened", {
           operation: "command",
           target: payload.command,
           action: "blocked",
         });
-        throw new Error(`PROTECTION_BLOCKED: ${decision.reason}`);
+        throw vetoError(decision.reason);
       }
     });
 
-    ctx.events.on("filesystem/before-write", (payload) => {
+    ctx.events.on("filesystem/before-write", async (payload) => {
       const decision = evaluate({
         operation: "filesystem.write",
         target: payload.path,
       });
       if (decision.action === "block") {
-        void ctx.events.emit("protection/intervened", {
+        await ctx.events.emit("protection/intervened", {
           operation: "filesystem.write",
           target: payload.path,
           action: "blocked",
         });
-        throw new Error(`PROTECTION_BLOCKED: ${decision.reason}`);
+        throw vetoError(decision.reason);
       }
     });
   },
 });
+
+/** Structured veto so the CLI classifies it as PROTECTION_BLOCKED. */
+function vetoError(reason: string): WorkspaceError {
+  return new WorkspaceError({
+    code: "PROTECTION_BLOCKED",
+    message: `PROTECTION_BLOCKED: ${reason}`,
+    provider: "repo-shield",
+    recoverable: false,
+    suggestions: [
+      "Avoid the destructive operation",
+      "Adjust repository.options.guards if the operation is intentional",
+    ],
+  });
+}

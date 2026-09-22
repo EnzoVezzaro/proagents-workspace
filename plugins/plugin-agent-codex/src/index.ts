@@ -47,6 +47,7 @@ function run(
 export const codexAgentPlugin = definePlugin({
   manifest: {
     id: "agent-codex",
+    provider: "codex",
     name: "Codex Agent",
     version: "0.1.0",
     description: "Codex CLI agent adapter with honest availability detection",
