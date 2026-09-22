@@ -1,0 +1,16 @@
+{
+  "id": "technical-writer",
+  "profile": "technical-writer",
+  "role": "coordinator",
+  "permissions": {
+    "read": "repo",
+    "write": "scoped",
+    "production": "none",
+    "secrets": "none",
+    "tools": ["filesystem", "shell", "git", "test runner", "acc check", "link check"],
+    "approvalGates": []
+  },
+  "context": [{ "framework": "acc", "scope": "repository" }],
+  "receivesFrom": ["qa-engineer"],
+  "emits": ["documentation-update.md", "review-verdict.md"]
+}

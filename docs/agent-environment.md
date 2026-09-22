@@ -105,7 +105,7 @@ Interview guidance, learned the hard way:
 
 - The intent should state the objective and stack; every topic word it contains (deploy, secrets, webhook, sub-agent…) pre-answers a question and shortens the questionnaire.
 - Answer text feeds the generated skills verbatim — write answers you would accept as skill content.
-- Session state lives in `.proagent/` locally; the committed artifacts (`proagents.lock`, `agent-architecture.json`) are the durable record.
+- Session state (`.proagent/session.json`) and the crew source (`.proagent/crews/agent-team/`) are committed so the repo is self-contained; the compiled artifacts (`proagents.lock`, `agent-architecture.json`) remain the durable, machine-generated record.
 
 ### Verification gate
 
@@ -114,7 +114,9 @@ proagent validate           # architecture: 0 errors, 0 warnings
 proagent validate --spec    # spec + lock: no findings
 proagent validate --profiles # registry profiles: all pass (PA030–PA038)
 proagent crew validate .proagent/crews/agent-team   # crew: PA043–PA048 clean
-acc check                   # repository contract: 0 diagnostics
+acc check                   # repository contract: 0 errors; the one expected
+                            # warning is ACC014 (the intentional packages ↔
+                            # plugins monorepo cycle, reviewed in packages/AGENTS.md)
 ```
 
 Also verify the composed skill's knowledge files are present (setup has historically not copied packaged-registry knowledge files, e.g. `knowledge/release-checklist.json`).

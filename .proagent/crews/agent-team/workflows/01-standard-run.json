@@ -1,0 +1,3 @@
+{
+  "body": "Standard run: backend-engineer produces patches and a change description -> qa-engineer and security-engineer review in parallel -> review verdict aggregates to technical-writer (coordinator) -> approved change plan hands off to devops-engineer and release-engineer, whose production actions are human-approval-gated."
+}

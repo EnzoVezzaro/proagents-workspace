@@ -1,0 +1,3 @@
+{
+  "body": "technical-writer owns documentation and coordination: aggregates review verdicts, updates docs/ per the Diataxis structure, keeps docs/index.md reachable, and runs the acc check gate."
+}

@@ -1,0 +1,3 @@
+{
+  "body": "acc check passes with 0 errors (the one reviewed warning is the intentional packages ↔ plugins cycle, ACC014), all docs links resolving, pnpm lint/typecheck/test/build passing, and CI green before any release or production action."
+}

@@ -1,0 +1,3 @@
+{
+  "body": "release-engineer owns releases: version bumps, changelog discipline (Keep a Changelog), release notes, rollback-first planning. Publishes only after explicit human approval."
+}

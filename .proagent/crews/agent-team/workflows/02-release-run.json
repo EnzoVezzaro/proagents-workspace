@@ -1,0 +1,3 @@
+{
+  "body": "Release run: qa-engineer verifies the release gate (acc check 0 errors with the reviewed ACC014 cycle warning, all links resolve, lint/typecheck/test/build pass, CI green) -> release-engineer prepares version bump, changelog and rollback plan -> human approves -> release-engineer publishes."
+}

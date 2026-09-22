@@ -1,8 +1,8 @@
-# Agent memory and transient agent state (not source)
+# Agent memory (local orientational knowledge, per ACC). The .proagent crew
+# source and session are committed so the repo is self-contained.
 .acc-memory.md
 docs/.acc-memory.md
 .acc/state/rollback/
-.proagent/
 
 # Dependencies and build output
 node_modules/

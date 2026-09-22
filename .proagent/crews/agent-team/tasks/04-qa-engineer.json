@@ -1,0 +1,3 @@
+{
+  "body": "qa-engineer owns review and verification: reviews patches against the verification lifecycle (acc check, pnpm lint/typecheck/test/build, CI green), produces the review verdict and the approved change plan."
+}

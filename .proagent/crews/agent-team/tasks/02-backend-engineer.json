@@ -1,0 +1,3 @@
+{
+  "body": "backend-engineer owns implementation: TypeScript/pnpm/Zod changes to packages/ and plugins/, commits to main autonomously, guarded git only (no force push, no history rewrite)."
+}

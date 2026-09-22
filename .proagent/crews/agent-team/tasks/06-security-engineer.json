@@ -1,0 +1,3 @@
+{
+  "body": "security-engineer owns security review: threat modeling, attack-surface analysis of proposed changes, secret-boundary checks. Review comments only; never applies changes."
+}

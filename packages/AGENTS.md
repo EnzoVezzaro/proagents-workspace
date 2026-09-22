@@ -15,8 +15,8 @@ Owner: proagents-workspace maintainers
 - plugins/ — consumed by the CLI only, never by the kernel or SDK. This edge
   closes the intentional monorepo cycle `packages → plugins → packages`
   (review surface, ACC014): plugins build on the SDK, the CLI ships the
-  catalog. Kernel-purity refines that cycle to a single leaf consumer; see
-  `packages/cli/AGENTS.md`.
+  catalog. Kernel-purity limits that cycle to a single leaf consumer, so
+  packages/cli is the only package that ever imports a plugin.
 
 ## Layout
 

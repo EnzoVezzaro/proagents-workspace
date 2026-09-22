@@ -1,0 +1,16 @@
+{
+  "id": "qa-engineer",
+  "profile": "qa-engineer",
+  "role": "reviewer",
+  "permissions": {
+    "read": "repo",
+    "write": "none",
+    "production": "none",
+    "secrets": "none",
+    "tools": ["filesystem", "shell", "git", "test runner", "vitest", "playwright"],
+    "approvalGates": []
+  },
+  "context": [{ "framework": "acc", "scope": "repository" }],
+  "receivesFrom": ["backend-engineer"],
+  "emits": ["review-verdict.md", "approved-change-plan.md"]
+}

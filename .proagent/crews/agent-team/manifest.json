@@ -1,0 +1,59 @@
+{
+  "schema": "proagents/crew/v1",
+  "version": "0.1.0",
+  "crew": {
+    "id": "agent-team",
+    "name": "agent-team",
+    "description": "Custom crew derived from the interview: professional profile: api documentation, architecture explainers and onboarding guides — written for the reader under pressure, examples over abstraction; server-side systems: apis, data integrity, re",
+    "author": "local",
+    "tags": [
+      "custom",
+      "from-interview"
+    ]
+  },
+  "mission": "mission.json",
+  "members": [
+    "members/01-technical-writer.json",
+    "members/02-backend-engineer.json",
+    "members/03-devops-engineer.json",
+    "members/04-qa-engineer.json",
+    "members/05-release-engineer.json",
+    "members/06-security-engineer.json"
+  ],
+  "coordination": [
+    "coordination/01-named-artifact-handoffs.json",
+    "coordination/02-failed-handoff-contract.json"
+  ],
+  "tasks": [
+    "tasks/01-technical-writer.json",
+    "tasks/02-backend-engineer.json",
+    "tasks/03-devops-engineer.json",
+    "tasks/04-qa-engineer.json",
+    "tasks/05-release-engineer.json",
+    "tasks/06-security-engineer.json"
+  ],
+  "workflows": [
+    "workflows/01-standard-run.json",
+    "workflows/02-release-run.json"
+  ],
+  "handoffs": [
+    "handoffs/01-backend-qa.json",
+    "handoffs/02-backend-security.json",
+    "handoffs/03-qa-coordinator.json",
+    "handoffs/04-qa-devops.json",
+    "handoffs/05-qa-release.json"
+  ],
+  "rules": [
+    "rules/01-permission-models.json",
+    "rules/02-guarded-git.json",
+    "rules/03-production-approval.json"
+  ],
+  "verification": [
+    "verification/01-artifacts-exist.json",
+    "verification/02-permission-compliance.json",
+    "verification/03-verification-lifecycle.json"
+  ],
+  "mcp": "mcp/servers.json",
+  "createdAt": "2026-01-01T00:00:00.000Z",
+  "updatedAt": "2026-01-01T00:00:00.000Z"
+}

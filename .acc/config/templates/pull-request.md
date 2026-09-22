@@ -25,7 +25,7 @@ Verification
 ✓ Typecheck
 ✓ Unit tests
 ✓ Build
-✓ acc check (0 diagnostics)
+✓ acc check (0 errors — one reviewed ACC014 cycle warning expected)
 
 Security
 --------

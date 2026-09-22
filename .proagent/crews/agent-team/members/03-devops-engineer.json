@@ -1,0 +1,16 @@
+{
+  "id": "devops-engineer",
+  "profile": "devops-engineer",
+  "role": "operator",
+  "permissions": {
+    "read": "repo",
+    "write": "none",
+    "production": "write",
+    "secrets": "none",
+    "tools": ["filesystem", "shell", "git", "docker", "kubernetes (read-only)"],
+    "approvalGates": ["every production action"]
+  },
+  "context": [{ "framework": "acc", "scope": "repository" }],
+  "receivesFrom": ["qa-engineer"],
+  "emits": ["rollout-log.md"]
+}

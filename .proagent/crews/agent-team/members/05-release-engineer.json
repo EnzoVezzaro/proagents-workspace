@@ -1,0 +1,16 @@
+{
+  "id": "release-engineer",
+  "profile": "release-engineer",
+  "role": "operator",
+  "permissions": {
+    "read": "repo",
+    "write": "scoped",
+    "production": "write",
+    "secrets": "named",
+    "tools": ["filesystem", "shell", "git", "npm publish", "acc check"],
+    "approvalGates": ["every production action", "npm publish"]
+  },
+  "context": [{ "framework": "acc", "scope": "repository" }],
+  "receivesFrom": ["qa-engineer"],
+  "emits": ["release-plan.md", "release-notes.md", "changelog-entry.md"]
+}

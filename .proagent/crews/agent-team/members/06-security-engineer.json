@@ -1,0 +1,16 @@
+{
+  "id": "security-engineer",
+  "profile": "security-engineer",
+  "role": "reviewer",
+  "permissions": {
+    "read": "repo",
+    "write": "none",
+    "production": "none",
+    "secrets": "none",
+    "tools": ["filesystem", "shell", "git", "test runner"],
+    "approvalGates": []
+  },
+  "context": [{ "framework": "acc", "scope": "repository" }],
+  "receivesFrom": ["backend-engineer"],
+  "emits": ["security-review.md"]
+}
