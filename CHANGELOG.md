@@ -11,6 +11,66 @@ the project stays on 0.x and everything may change.
 
 ### Added
 
+- Lifecycle definitions and harness adapters as plugins (completing spec §146 for the current surface):
+  - `lifecycle` capability (16th entry in the §9 registry): `LifecycleProvider` contributes named lifecycle definitions as pure DATA via the SDK's new `definitions()` hook — a plugin cannot inject behavior, only reusable workflows. Two bundled definition plugins: `@proagents/plugin-lifecycle-web` (web-development: understand → plan → implement → unit/browser tests → review → ship) and `@proagents/plugin-lifecycle-security` (security-audit: understand → static review → threat model → verify findings → report). The control-room lifecycle library merges plugin contributions + `PAW_LIFECYCLE_JSON` + the built-in default (config wins on collision), `GET /api/lifecycles` exposes it with honest `source` labels (plugin|config|built-in), and the wizard gains a lifecycle picker bound to the chat's workspace entry.
+  - Harness adapter plugins declare the same `runtime` descriptor as agent plugins (`agent-codex` now carries `capability: harness` + descriptor); the launchable-kind catalog dedupes agent and harness plugins into one row per kind with adapter lists — one catalog, two plugin families.
+  - 9 new tests (contribution validation, config-schema conformance of plugin definitions, kind dedupe, descriptor completeness) — 261 green.
+
+- Plugin-first architecture pinned as normative spec **section 146** (DeepSeek-Harness-inspired): everything that can be replaced, extended, configured, or composed is a plugin; the core provides runtime, contracts, lifecycle orchestration, events, permissions, and workspace isolation only. Additive contract support: plugin manifests may declare a `runtime` descriptor (`kind: process|service|external`, `command`, `label` — spec section 59) describing how the capability materializes outside the kernel. The agent CLI plugins and the DSH plugin declare their launch commands via the descriptor; the control room now derives the launchable agent-kind catalog (`GET /api/agents/kinds`) and harness launch commands from the plugin catalog's descriptors instead of hard-coded agent-kind→binary tables — a newly added agent plugin becomes launchable with zero product-layer code change. Consumers resolve declarations generically; the lifecycle engine never branches on provider names; default lifecycles/plugin sets are configuration data, never compiled-in behavior. Docs synced (`docs/architecture.md`), AGENTS.md constraint added.
+
+- Configurable development lifecycle per chat/workspace (spec sections 6/16):
+  `lifecycle.definitions` + `lifecycle.default` in workspace.yaml and
+  `lifecycle: { ref | inline }` per workspace entry, validated by Zod in
+  `@proagents/contracts` (`DevelopmentLifecycle`, `LifecycleStage` — stage
+  type understand|plan|implement|test|review|ship|custom, per-stage agent
+  profile bindings, tool bindings, execution policy: required/onFailure
+  stop|retry|continue/maxRetries/timeoutMs/parallel). Kernel `LifecycleRunner`
+  executes the resolved lifecycle with declarative failure semantics (only
+  required stage failures fail the run; optional failures recorded honestly),
+  emitting typed `lifecycle/stage-started|stage-completed|completed` events —
+  stage EXECUTION is delegated to an injected `StageExecutor` (kernel purity,
+  §139); `parallel` is advisory in this milestone and reported as such. The
+  control room wires a default six-stage lifecycle (Understand → Plan →
+  Implement → Test → Review → Ship) into every new chat, runs it through the
+  crew's REAL terminal, and renders a Lifecycle Inspector rail as a pure
+  projection over the `lifecycle/*` events, plus `POST
+  /api/workspaces/:id/run-lifecycle` to trigger a run. 11 new tests — 252
+  green.
+
+- Wizard launch is now a fully SEQUENCED provisioning pipeline (the launch
+  contract: configure → terminal → clone/folder-bind → install packages →
+  ACC + proagents scaffold → harness): every setup step runs as a real
+  command in the workspace's REAL terminal and is awaited on its true exit
+  code via the new `runCommandAwait` PTY primitive (split-sentinel marker —
+  echo-race safe, history-safe, real exit codes; `rc=$?` captured before
+  assignments could reset it). The harness launches only into a FULLY
+  provisioned workspace; a failed step keeps the raw shell, reports the
+  failed step + exit code honestly (`provisioning.ok=false`), and recovery
+  is one click: `POST /api/agents/:id/launch` + a `▶ Launch harness` button
+  in the chat header. `ensureGitAskpass` moves GitHub authentication out of
+  the typed command entirely (a 0700 helper reading the token from the env
+  at call time — no more token-in-URL echoed into scrollback/history),
+  `GIT_TERMINAL_PROMPT=0` fails fast instead of hanging the PTY, and
+  `assertCloneTarget` now rejects credential-embedding URLs. The ACC +
+  proagents scaffold no longer clobbers an existing AGENTS.md or context
+  file on connected folders. 14 new tests (real-shell PTY await/exit-code/
+  sequencing/echo-race, askpass secrecy, scaffold end-state) — 241 green.
+
+- Agent hiring + project connection in the control room (the MVP's operational core):
+  - `@proagents/plugin-agent-cli` — CLI agent adapters for `claude`, `codex`, `opencode`, `gemini` (Tier-2 process adapters): honest availability probing on PATH, `AGENT_PROVIDER_UNAVAILABLE` when missing, the CLI's stderr surfaced verbatim on a failed run, and per-workspace activation (an agent can only reach the adapter declared for its own scope).
+  - Hire flow (`POST /api/agents/hire`): declaring a named workspace entry in the effective config (reconstructable-from-config preserved), mounting it through the kernel `WorkspaceManager` (own root, sandbox mode, plugin scope, session log), resolving the agent provider **from the mounted scope**, and starting the session with a hireable profile prompt distilled from `.acc/config/agents/`. Prompts prepend the profile prompt (who the agent is) to the task (what it does now); transcripts, status, and the kernel session log record every exchange. Stop ends the session and unmounts the scope; a failed hire is fail-closed (mount + entry reversed). N agents run concurrently in isolated workspaces.
+  - Project connection (`POST /api/projects/local`, `POST /api/projects/github`): local folders must live inside the UI base dir (validated); GitHub repos clone through the kernel's guarded git plugin into `<base>/repos/<name>` (owner/repo shorthand or https URL; an optional token from `PAW_GITHUB_TOKEN`/`GITHUB_TOKEN` is used inside the git URL only — scrubbed from every error path, never logged).
+  - Agents can be hired into a connected project by passing its root — the isolated workspace IS the project checkout.
+  - Kernel fix found by the hire flow: plugins activating into a workspace scope now receive their manifest permission grants (merge semantics via `refinePlugin`, so parent-boot refinements are preserved).
+  - 16 new unit tests (roster lifecycle, fail-closed teardown, project registry) — 206 tests green.
+- Control-room web UI (`app/`, `@proagents/ui`) — the first runnable slice of `PROAGENTS-WORKSPACE-UI.md`'s MVP: boots a real kernel via `WorkspaceClient` with the bundled plugin catalog, serves a zero-build single-page control room (`paw-ui` / `pnpm ui`), and exposes the kernel as a projection — SSE event feed over the typed bus, named-workspace mount/unmount (§141), session-log tails (§143), guarded shell + filesystem writes through the kernel providers. Enforcement stays in the kernel: repo-shield/shell vetoes surface as structured `APPROVAL_REQUIRED` before execution (§101–102). Integration-tested end to end.
+- Spec section 145 + `PROAGENTS-WORKSPACE-UI.md`: the desktop UI & product architecture supplement (structured like `DISTRIBUTION.md`), specifying the UI layer above the kernel — one workspace, many concurrent agent runtimes across heterogeneous harnesses; terminals as first-class owned objects; event-sourced sessions with trajectory/global-trajectory projections; cross-harness handoff and fork; capability-driven agent tabs; command palette, registry, and MVP/phased delivery. README §145 pins the binding boundary: the UI is a projection over kernel events/session log, adapts to `HarnessProvider` capabilities, and reports enforcement tiers honestly. Indexed from `docs/index.md` and cross-linked from `docs/workspace-implementation.md`.
+- Spec sections 141–144: multi-workspace isolation (named workspaces, scoped service resolution, mount/unmount lifecycle, configuration-reconstructability), sandbox policy (modes, same-world confinement honesty, fail-closed semantics), the per-workspace append-only session log, and harness adapters (`HarnessProvider`, integration tiers `native`/`process`, normalized `session/*`/`model/*`/`compaction/*` lifecycle events). Docs synced (`configuration.md`, `workspace-implementation.md`).
+- Typed harness adapter contracts in `@proagents/contracts`: `HarnessProvider` with honest integration tier (`native` | `process` — a process adapter can never claim native), `HarnessEnforcement` reporting whether a decision was actually applied and whether enforcement is blocking or advisory, and the normalized harness-side events in the typed event map.
+- Multi-workspace isolation, sandbox policy, and session log implementation (DeepSeek Harness-inspired; spec sections 141–143):
+  - `@proagents/kernel` gains `ScopedServiceRegistry`/`ShadowingServiceRegistry` (one capability instantiated independently per workspace — the Cordis `ctx.isolate()` counterpart), `WorkspaceManager` (mounts N named workspaces concurrently from a new `workspaces:` map in workspace.yaml; each scope gets its own registry view, sandbox mode, session log, and plugin activation; unmount disposes exactly its scope), and `SessionLog` (per-workspace append-only JSONL under `.paw/sessions/<workspace>/session.jsonl`, redacted at write time, bounded `tail()`).
+  - New events `workspace/mounted` / `workspace/unmounted`; new error codes `WORKSPACE_ALREADY_MOUNTED`, `SANDBOX_UNAVAILABLE`, `SANDBOX_POLICY_VIOLATION` (fail-closed semantics).
+  - Sandbox policy modes `read-only` / `workspace-write` (default, back-compat) / `danger-full-access` (spec section 142): `filesystem` vetoes writes before execution under `read-only` (`SANDBOX_POLICY_VIOLATION`); `shell` fails CLOSED with `SANDBOX_UNAVAILABLE` under `read-only` because a host-process shell cannot enforce read-only confinement — honestly reported, never silently downgraded.
 - TypeScript implementation of the Workspace as a plugin system (pnpm monorepo):
   - `@proagents/contracts` — the 16 capability contracts (spec section 9), stable error codes (§99), typed event map (§7), Zod schemas for `workspace.yaml` and plugin manifests (§59, §119).
   - `@proagents/kernel` — event bus, service/capability registries, plugin discovery with dependency resolution and cycle detection, lifecycle state machine, declarative permission framework with approval modes (§34), health aggregation (§62–63), secrets-redacting structured logger (§100).

@@ -59,6 +59,12 @@ ProAgents Workspace is an open-source, agent-first execution environment where A
 | **Repo Shield** | Protection & security policies |
 | **reposell** | Distribution, licensing & commerce |
 
+### Product Supplements
+
+| Document | Description |
+|----------|-------------|
+| [UI Product Spec](../PROAGENTS-WORKSPACE-UI.md) | Desktop shell, multi-agent runtimes, terminals, trajectory, cross-harness view — the UI layer above the kernel |
+
 ## Design Principles
 
 1. **Agent-first** - Primary consumer is an AI agent

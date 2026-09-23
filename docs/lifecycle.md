@@ -147,3 +147,49 @@ Different projects define different loops:
 ```
 
 This makes the Workspace more than an environment that **runs tests**: it becomes an environment that can **execute an entire programmable development-and-validation lifecycle**.
+
+## Implemented Lifecycle Model (v0.1)
+
+The lifecycle is a first-class configuration surface in `workspace.yaml`, validated by `@proagents/contracts` and executed by the kernel's `LifecycleRunner`:
+
+```yaml
+lifecycle:
+  definitions:
+    - id: web-app
+      name: Web application lifecycle
+      stages:
+        - id: implement
+          name: Implement
+          type: implement          # understand|plan|implement|test|review|ship|custom
+          agents:
+            - profileId: nodejs-engineer
+              role: implementer
+          tools:
+            - id: terminal
+              type: terminal
+            - id: git
+              type: git
+          policy:
+            required: true          # a failed required stage fails the run
+            onFailure: stop         # stop | retry | continue
+            maxRetries: 1           # retry budget when onFailure: retry
+            timeoutMs: 600000       # per-stage wall-clock budget (optional)
+        - id: test
+          name: Test
+          type: test
+          tools: [{ id: vitest, type: vitest }]
+          policy: { required: false, onFailure: continue }
+  default: web-app                   # used when a workspace names no lifecycle
+
+workspaces:
+  flight-booking:
+    root: agents/flight-booking
+    lifecycle: { ref: web-app }      # or an inline definition
+```
+
+Execution semantics:
+
+- Stages run in declaration order; `parallel: true` is **advisory** in this milestone (reported honestly, not hidden behind fake concurrency).
+- Stage execution is delegated to an injected `StageExecutor` — the kernel provides sequencing, policies, and events; it never spawns agents or runs tools itself (kernel purity, spec section 139).
+- Per-stage progress flows over the typed event bus: `lifecycle/stage-started`, `lifecycle/stage-completed`, `lifecycle/completed`. The UI Lifecycle Inspector (see `PROAGENTS-WORKSPACE-UI.md` section 51) is a pure projection over these events.
+- A lifecycle run resolves the workspace's entry (`lifecycle.inline` preferred, then `lifecycle.ref`, then the top-level `lifecycle.default`); an unknown ref is a structured `CONFIG_INVALID` error.

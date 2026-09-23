@@ -1,0 +1,45 @@
+{
+  "name": "@proagents/ui",
+  "version": "0.1.0",
+  "description": "Control-room web UI for ProAgents Workspace — boots a real kernel via the SDK, streams workspace events, mounts named workspaces (spec sections 141–144, PROAGENTS-WORKSPACE-UI.md MVP).",
+  "license": "MIT",
+  "type": "module",
+  "engines": { "node": ">=18" },
+  "bin": { "paw-ui": "./dist/server.js" },
+  "main": "./dist/server.js",
+  "types": "./dist/server.d.ts",
+  "exports": { ".": { "types": "./dist/server.d.ts", "default": "./dist/server.js" } },
+  "files": ["dist", "src/public"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsx watch src/server.ts",
+    "start": "node dist/server.js",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src",
+    "test": "vitest run",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@proagents/contracts": "workspace:*",
+    "@proagents/kernel": "workspace:*",
+    "@proagents/plugin-agent-codex": "workspace:*",
+    "@proagents/plugin-agent-cli": "workspace:*",
+    "@proagents/plugin-agent-dsh": "workspace:*",
+    "@proagents/plugin-context-acc": "workspace:*",
+    "@proagents/plugin-git": "workspace:*",
+    "@proagents/plugin-repo-shield": "workspace:*",
+    "@proagents/plugin-runtime-docker": "workspace:*",
+    "@proagents/plugin-runtime-local": "workspace:*",
+    "@proagents/plugin-shell": "workspace:*",
+    "@proagents/plugin-filesystem": "workspace:*",
+    "@proagents/plugin-lifecycle-web": "workspace:*",
+    "@proagents/plugin-lifecycle-security": "workspace:*",
+    "@proagents/workspace": "workspace:*"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.2",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4",
+    "concurrently": "^9.1.0"
+  }
+}

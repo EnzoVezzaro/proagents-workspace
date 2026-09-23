@@ -47,6 +47,25 @@ export const filesystemPlugin = definePlugin({
   activate(ctx) {
     const root = path.resolve(String(ctx.pluginOptions()["root"] ?? "/workspace/repo"));
     const logger = ctx.logger;
+    // Sandbox policy of THIS plugin instance's workspace scope (spec 142).
+    // Undefined = parent workspace; read-only vetoes writes before any byte
+    // is touched — BEFORE the before-write event even fires.
+    const sandbox = ctx.sandbox;
+
+    const assertWritable = (): void => {
+      if (sandbox === "read-only") {
+        throw new WorkspaceError({
+          code: "SANDBOX_POLICY_VIOLATION",
+          message: `Filesystem write denied: workspace sandbox policy is read-only.`,
+          provider: "filesystem",
+          recoverable: false,
+          suggestions: [
+            "Set sandbox.mode: workspace-write on the workspace entry",
+            "Use a workspace scope with write access for this operation",
+          ],
+        });
+      }
+    };
 
     // Refine the effective permission request to the ACTUAL configured root
     // (config grants are intersected again, so this cannot exceed workspace.yaml).
@@ -72,6 +91,7 @@ export const filesystemPlugin = definePlugin({
         return fs.readFile(resolved, request.encoding ?? "utf8");
       },
       async write(request) {
+        assertWritable();
         ctx.permissions.require({ pluginId: "filesystem", category: `filesystem:write:${root}`, target: request.path });
         const resolved = resolveWithin(root, request.path, "write");
         const content = Buffer.from(request.content, "utf8");
@@ -103,6 +123,7 @@ export const filesystemPlugin = definePlugin({
         return entries.map((e) => path.join(resolved, e.name));
       },
       async remove(request) {
+        assertWritable();
         ctx.permissions.require({ pluginId: "filesystem", category: `filesystem:write:${root}`, target: request.path });
         const resolved = resolveWithin(root, request.path, "write");
         // Deletion is also a write: protection must veto BEFORE it executes,

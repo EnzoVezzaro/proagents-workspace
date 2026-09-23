@@ -21,6 +21,11 @@ export interface WorkspaceClientOptions {
   config: unknown;
   plugins?: readonly PluginDefinition[];
   /**
+   * Sandbox policy for the parent workspace (spec section 142). Named
+   * workspaces declare theirs in their `workspaces:` entry instead.
+   */
+  sandbox?: import("@proagents/contracts").SandboxMode;
+  /**
    * Treat the provided plugins as a CATALOG: they activate only when the
    * workspace configuration references them (by id or capability). Use this
    * for bundled plugin sets, e.g. the CLI's. Default is explicit activation.
@@ -46,6 +51,7 @@ export class WorkspaceClient {
         config: this.options.config,
         approvalFlow: this.options.approvalFlow,
         logSink: this.options.logSink,
+        sandbox: this.options.sandbox,
       },
       (this.options.plugins ?? []).map((definition) => ({
         source: definition.manifest.id,

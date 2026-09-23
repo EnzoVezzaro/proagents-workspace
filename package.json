@@ -8,12 +8,18 @@
   "engines": {
     "node": ">=18"
   },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "node-pty"
+    ]
+  },
   "scripts": {
     "build": "pnpm -r --workspace-concurrency=1 run build",
     "typecheck": "pnpm -r --workspace-concurrency=1 run typecheck",
     "lint": "pnpm -r --workspace-concurrency=1 run lint",
     "test": "vitest run",
     "test:watch": "vitest",
+    "ui": "pnpm --filter @proagents/ui dev",
     "clean": "pnpm -r run clean && rm -rf coverage"
   },
   "devDependencies": {
@@ -22,6 +28,7 @@
     "@types/node": "^22.10.0",
     "@vitest/coverage-v8": "^3.2.4",
     "eslint": "^9.39.0",
+    "node-pty": "1.0.0",
     "typescript": "^5.9.2",
     "typescript-eslint": "^8.46.0",
     "vitest": "^3.2.4"

@@ -422,6 +422,22 @@ export interface ProtectionProvider extends ProviderBase {
 }
 
 // ---------------------------------------------------------------------------
+// Lifecycle (spec sections 6, 16, 146 — lifecycle definitions as plugins)
+// ---------------------------------------------------------------------------
+
+/**
+ * A lifecycle plugin contributes named development lifecycle definitions to
+ * the workspace's lifecycle library. Definitions are pure DATA — the kernel
+ * lifecycle engine stays the sole authority over sequencing, policies, and
+ * gates (spec section 146). A plugin cannot inject behavior into a run; it
+ * only makes reusable workflows available for configuration to reference.
+ */
+export interface LifecycleProvider extends ProviderBase {
+  /** The definitions this plugin contributes (static or environment-derived). */
+  definitions(): Promise<readonly import("./schemas.js").DevelopmentLifecycle[]>;
+}
+
+// ---------------------------------------------------------------------------
 // Distribution (reposell layer — cross-cutting)
 // ---------------------------------------------------------------------------
 
@@ -452,6 +468,7 @@ export const CAPABILITIES = [
   "observability",
   "protection",
   "distribution",
+  "lifecycle",
 ] as const;
 
 export type CapabilityId = (typeof CAPABILITIES)[number];

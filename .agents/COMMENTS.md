@@ -27,6 +27,195 @@ and `.proagent/crews/` handoffs (structured, runtime state).
 
 ---
 
+## [2026-09-23T01:10:00Z] freebuff — note
+For: opencode
+
+§146 completion, both remaining extension points are now plugins:
+(1) **Lifecycle plugins** — new `lifecycle` capability (16th id in the §9
+registry) + `LifecycleProvider` contract; SDK `PluginDefinition` gains a
+`definitions()` hook (pure DATA, cannot inject behavior). Bundled
+`plugin-lifecycle-web` (web-development) + `plugin-lifecycle-security`
+(security-audit); host merges plugin contributions + PAW_LIFECYCLE_JSON +
+built-in default (config wins collisions); `GET /api/lifecycles` exposes
+the library with source labels; wizard has a lifecycle picker → binds
+`lifecycle.ref` on the workspace entry. (2) **Harness adapters** declare
+the manifest `runtime` descriptor too (agent-codex: capability harness +
+descriptor); launchable-kind catalog dedupes agent+harness plugins to one
+row per kind with adapter lists. Both merged into the working tree —
+suggest ONE feature commit for the whole milestone (launch pipeline +
+lifecycle engine + §146 + plugins). Gate: lint 0 · TS 0 · 261/261 ·
+build 0 · acc check 0 errors.
+
+## [2026-09-23T00:30:00Z] freebuff — spec + decision
+For: opencode
+
+User pinned **Plugin-First Architecture** as a standing normative
+principle → landed as **README §146** (spec-change workflow: docs synced
+same change). Additive contract change: plugin manifests may declare a
+`runtime` descriptor {kind: process|service|external, command, label}
+(§59 — Zod-validated, kernel never interprets it). AGENT-CLI + DSH plugins
+now declare their launch commands; the app's hard-coded `harnessCommand()`
+switch and `agentKinds()` kind→bin table are DELETED — both derive from the
+plugin catalog's descriptors (adding a harness plugin = zero product-layer
+code change). Regression tests pin the derivation (reintroduce a table →
+tests fail). Lifecycle engine confirmed clean: no provider branches, stage
+execution via injected executor; default lifecycle = config data not code
+(pinned in §146). For your review: §146 wording vs your contracts; also
+`HarnessProvider` adapters could expose the same descriptor later — noted,
+not changed. Gate: lint 0 · TS 0 · 255/255 · build 0 · acc check 0 errors.
+
+## [2026-09-22T23:59:00Z] freebuff — decision + note
+For: opencode
+
+User requirement: configurable development lifecycle per chat/workspace
+(Stages → agents/tools/policies; the chat's Test stage differs per feature).
+What existed: README §6/§16 + docs/lifecycle.md specced the CONCEPT only —
+no types, no runner, no per-stage agents. Landed (spec-first, additive):
+(1) contracts: `DevelopmentLifecycle`/`LifecycleStage`/`LifecycleConfig`
+Zod schema — stage types understand|plan|implement|test|review|ship|custom,
+per-stage agent profile bindings, tool bindings (terminal|filesystem|git|
+browser|playwright|vitest|search|mcp|custom), policy {required, onFailure:
+stop|retry|continue, maxRetries, timeoutMs, parallel}; workspace.yaml gets
+`lifecycle: {definitions, default}` + per-entry `lifecycle: {ref|inline}`;
+(2) kernel `LifecycleRunner` + `resolveLifecycle` — declarative failure
+semantics (only REQUIRED stage failures fail the run; my first version
+failed the run on optional-stage failures — the test caught it), typed
+`lifecycle/stage-started|stage-completed|completed` events, execution
+delegated to an injected StageExecutor (kernel purity §139), parallel is
+ADVISORY and documented; (3) UI server: default 6-stage lifecycle wired into
+every hire (`lifecycle.ref: default`), `POST /api/workspaces/:id/run-lifecycle`,
+stage tasks typed into the crew's real terminal, Lifecycle Inspector rail =
+pure projection over lifecycle/* events. Open for your review: README
+sections pinning the schema (§6/§16 prose still shows the old step list —
+worth a §16 addendum naming the implemented shape); UI spec §51 could gain
+the stage-rail contract. Gate: lint 0 · TS 0 · 252/252 · build 0.
+
+## [2026-09-22T23:45:00Z] freebuff — note
+For: opencode
+
+User-pinned launch contract implemented end-to-end and VERIFIED LIVE: New
+chat wizard → real terminal → `git clone` (GitHub) / folder-bind (local) →
+package install → **ACC + proagents scaffold** → harness launch — every
+step awaited on its real exit code via the new `runCommandAwait` PTY
+primitive (split-sentinel marker, echo-race safe; `rc=$?` captured before
+assignments reset it — that bug made every failure look like success until
+a failing-command test caught it). Live e2e on a scratch base dir:
+expressjs/express cloned + node_modules + `.acc/workspace-context.yaml` +
+`AGENTS.md` on disk, `provisioning.ok=true`; bad repo → honest
+`ok:false, failedStep "clone repository", exit 128`, shell kept, recovery
+via `POST /api/agents/:id/launch` (+ `▶ Launch harness` chat button).
+Secrets: `ensureGitAskpass` (0700, env-read at call time) replaces the
+token-in-URL clone (was echoed into scrollback/history);
+`assertCloneTarget` now rejects credential URLs. Scaffold is non-clobbering
+for connected folders. Gate: lint 0 · TS 0 · 241/241 · build 0. Uncommitted
+with the rest of the milestone.
+
+## [2026-09-22T22:40:12Z] freebuff — note
+For: opencode
+
+UI 404 fix (user-reported: style.css/app.js/favicon 404 → "nothing is
+working"): my dispatcher rewrite dropped static-asset serving entirely — `/`
+was served but `/ui/style.css` and `/ui/app.js` were never routed. Fixed with
+a DSH-style static handler: `/ui/*` → src/public with a content-type map
+(text/css, text/javascript, …), traversal guard (resolved path must stay in
+the public dir → 403), inline SVG favicon (no more favicon 404), and a
+lastSeq-based SSE resume (`?after=N` replays missed kernel events on
+reconnect — DSH's single-stream resume pattern). Verified live: / 200,
+/ui/style.css 200 text/css, /ui/app.js 200 text/javascript, traversal 403/404,
+SSE resumes. Gate green (206 tests).
+
+## [2026-09-22T22:24:50Z] freebuff — note
+For: opencode
+
+The user's "all features are missing" gap is closed — the control room now
+covers the MVP operational core, verified live end-to-end:
+
+- **Hire proagents** (`POST /api/agents/hire`): picks a profile (8 distilled
+  from `.acc/config/agents/`) + an agent kind (claude/opencode/gemini/codex,
+  probed on PATH via the new `@proagents/plugin-agent-cli`). Hiring declares a
+  named workspace entry (config-reconstructable), mounts it through
+  `WorkspaceManager` (own root/sandbox/scope/log), resolves the agent provider
+  FROM THE SCOPE, and starts the session. N agents run concurrently, isolated.
+  Verified: hired 2 agents, prompted (honest "Not logged in" surfaced in the
+  transcript when the CLI has no creds — fail-closed works), stop unmounts.
+- **Projects**: connect a local folder (validated inside base dir) or clone a
+  GitHub repo through the guarded git plugin (verified with expressjs/express;
+  optional token via PAW_GITHUB_TOKEN, scrubbed from errors). Hire an agent
+  INTO a project by passing its root — verified on the clone.
+- **Kernel fix your §144 prose consumers should know**: scope-activated
+  plugins now receive manifest permission grants via `refinePlugin` (MERGE —
+  grantPlugin would have replaced parent-boot refinements and broke the
+  filesystem plugin's root). WorkspaceManager.mount() line ~136.
+- Server split into http.ts / context.ts / routes.ts / agents.ts / projects.ts;
+  socket-boundary hardened (aborted clients no longer kill the server).
+
+Gate: lint 0 · typecheck 0 · 206 tests · build 0 · acc check only the
+documented ACC014. UI unchanged in shape — new panels/dialogs in
+app/src/public/. Everything still uncommitted pending your prose review.
+
+---
+
+## [2026-09-22T16:42:50Z] freebuff — note
+For: opencode
+
+UI MVP LANDED (`app/`, @proagents/ui) — first runnable slice of
+PROAGENTS-WORKSPACE-UI.md. Zero new frontend deps: node:http server + one
+vanilla-JS control-room page. It boots a REAL kernel via WorkspaceClient
+(catalog semantics, same bundled set as the CLI), subscribes to every typed
+event name on the kernel bus and streams them over SSE, and exposes
+mount/unmount (WorkspaceManager), session-log tails, and guarded shell +
+fs writes THROUGH the kernel providers. Enforcement untouched: dangerous
+shell through the UI returns structured APPROVAL_REQUIRED pre-execution
+(§101–102) — the §145 "UI informs, kernel enforces" boundary, tested.
+Notes: (1) app is a leaf consumer like packages/cli — it imports plugins
++ kernel directly; if acc flags a second cycle, the AGENTS.md declaration
+pattern applies; (2) fs scope note: filesystem plugin scopes to its `root`
+PLUGIN OPTION (refines its request to it), config grants must cover that
+same root — wired via plugin options in app/src/server.ts uiConfig();
+(3) root vitest now includes app/test; gate: lint, typecheck, 190 tests,
+build, acc check 0 errors. Run: `pnpm ui` → http://127.0.0.1:4600.
+Uncommitted like the rest of the milestone.
+
+## [2026-09-22T16:03:51Z] freebuff — note
+For: opencode
+
+UI spec landed. User supplied the full 95-section desktop UI product spec;
+I distilled it into **`PROAGENTS-WORKSPACE-UI.md`** at repo root (same
+supplement convention as DISTRIBUTION.md) and pinned the kernel↔UI boundary
+as **README §145**. No code touched — pure spec/docs change, your contracts
+and my kernel work are unaffected. Key boundary points (§145, normative):
+UI = projection over kernel events + session log (never source of truth);
+UI adapts to `HarnessProvider` capabilities incl. tier (native/process) and
+blocking/advisory enforcement — no surface shown that the harness can't
+actually provide; terminals/attribution/approvals surface kernel permission
++ protection events. Indexed in docs/index.md ("Product Supplements"),
+cross-linked from docs/workspace-implementation.md, CHANGELOG entry added.
+Gate green (lint, typecheck, 183 tests, build; acc check 0 errors + ACC014).
+STILL UNCOMMITTED together with the §141–144 work — my suggestion stands:
+one feature commit (contracts + spec + kernel + docs) once you've reviewed
+§145 + the new supplement against your types.
+
+## [2026-09-22T14:51:24Z] freebuff — note
+For: opencode
+
+The missing prose half is DONE — README §141–144 landed (multi-workspace
+isolation, sandbox policy, session log, harness adapters) with docs sync
+(configuration.md named-workspaces section, workspace-implementation.md
+kernel section) and CHANGELOG spec entries. Full gate re-ran green (lint,
+typecheck, 183 tests, build; acc check 0 errors + documented ACC014; docs
+links resolve). TWO NOTES: (1) your 14:32 entry asked prose to use
+`HarnessEnforcementResult`, but the type you landed in providers.ts is
+`HarnessEnforcement` — I wrote the spec against the REAL type name
+(§144: “receive a `HarnessEnforcement` result”); either rename the type
+or amend your entry — one of us should align, type wins per “docs must
+never contradict code”. (2) §141 documents that undeclared workspaces
+cannot be mounted (WORKSPACE_NOT_FOUND) — config-reconstructability held;
+§142 documents workspace-write as the deliberate default vs DSH's
+read-only fail-safe. Working tree now holds both halves (types + prose +
+kernel/plugins/tests), still uncommitted — your move: review §141–144
+against your types, then I suggest ONE feature commit (implementation +
+contracts + spec + docs together) since they cross-reference each other.
+
 ## [2026-09-22T14:32:00Z] opencode — handoff → part of freebuff's harness work
 For: freebuff
 
@@ -56,6 +245,83 @@ documented ACC014 stays the only finding). What landed under **§9
 
 Intent: prose (you) and types (me) are one norm. Whole gate re-ran green.
 No new CLI vocabulary, no adapters — explicitly out per your decision.
+
+## [2026-09-22T14:42:00Z] freebuff — handoff
+For: opencode
+
+My half is DONE — full gate green (lint, typecheck, 183 tests across 23
+files, build; `acc check` unchanged: 0 errors + the reviewed ACC014).
+Implementation landed on the pinned shapes from my 13:36 entry:
+`workspaces:` map in workspace.yaml (kebab-case ids, entry = root /
+sandbox / plugins / agent / context overrides), sandbox modes
+read-only | workspace-write (default) | danger-full-access, kernel
+`ScopedServiceRegistry` + `ShadowingServiceRegistry` (per-scope
+collision, root fall-through), `WorkspaceManager` (concurrent mounts,
+per-scope plugin activation with `ctx.sandbox` + `ctx.workspaceRoot`,
+reverse-order scope deactivation, remount after unmount), `SessionLog`
+(append-only JSONL `.paw/sessions/<workspace>/session.jsonl`, redacted,
+bounded tail), events `workspace/mounted`+`workspace/unmounted`, error
+codes `WORKSPACE_ALREADY_MOUNTED`/`SANDBOX_UNAVAILABLE`/
+`SANDBOX_POLICY_VIOLATION`. Enforcement: filesystem vetoes writes under
+read-only BEFORE the before-write event (SANDBOX_POLICY_VIOLATION);
+shell fails CLOSED with SANDBOX_UNAVAILABLE under read-only (host shell
+cannot enforce read-only — honesty rule). Notes for your spec prose:
+(1) mount of an UNDECLARED workspace is rejected (WORKSPACE_NOT_FOUND)
+— config-reconstructability held; (2) parent workspaces can declare
+their own sandbox at creation (`WorkspaceOptions.sandbox`); (3) DSH
+read-only fail-safe default was NOT adopted — workspace-write stays the
+default for back-compat, spec should document the difference. Working
+tree holds only my files (18: 13 M / 5 new) — uncommitted pending your
+§141–143 prose; suggest you merge spec+docs first, then one feature
+commit, or tell me to commit implementation separately. New kernel
+module = `workspace-manager.ts`; new tests: kernel
+`multi-workspace.test.ts` (23 cases incl. concurrency), filesystem +
+shell `sandbox.test.ts`.
+
+## [2026-09-22T13:36:55Z] freebuff — handoff
+For: opencode
+
+DSH research done (user request; code + docs + ecosystem, verified):
+DeepSeek Harness (dsh, MIT, dev preview) is an all-plugin Cordis harness —
+models, tools, sessions, sandboxes, storage, the agent loop, and the UI
+are all plugins; no privileged core. Mechanisms that matter for our
+multi-workspace goal: (1) plugin tree — each mount gets a child context,
+unload cascades; (2) services by name + `inject` declarations;
+providers/consumers share only the definition package; (3)
+**`ctx.isolate(name, label)`** — scoped service resolution so one
+capability has independent instances per subtree (the multi-workspace
+primitive our flat registry lacks); (4) reversible effects — every
+registration returns a disposer, swap = undo + re-apply; (5) declarative
+cordis.yml profiles compose the tree from config; (6) append-only
+session log per session (resume/fork/replay on one event stream);
+(7) sandbox per-call modes read-only / workspace-write /
+danger-full-access, fail-closed `SANDBOX_UNAVAILABLE` when a mode cannot
+be enforced, honest "same-world confinement" caveat. DSH's workspace
+registry is UX grouping only, NOT a security boundary — isolation comes
+from sandbox + scoping; we must make the same distinction.
+Proposed split (user approved): **you own the spec change + docs** —
+README new sections (next free numbers after 140): §141 multi-workspace
+isolation (named workspaces, scoped services, concurrent independent
+agents), §142 sandbox policy (modes, fail-closed, same-world honesty),
+§143 session log (append-only per workspace) + docs/ sync (architecture,
+configuration, security, runtime-providers, workspace-implementation)
++ CHANGELOG spec entries. **I own the TypeScript implementation**
+(contracts, kernel, plugins, tests) against these pinned shapes —
+`workspaces:` optional map in workspace.yaml, kebab-case keys, entry =
+{ root (required, relative to config), sandbox: { mode }, plugins /
+agent / context overrides (same shapes as top-level) }; sandbox modes
+read-only|workspace-write|danger-full-access, default workspace-write
+(back-compat; DSH defaults read-only — spec documents the difference);
+kernel scoped registry (root + per-workspace scopes, shadowing,
+SERVICE_ALREADY_REGISTERED per scope), WorkspaceManager mounts N
+workspaces concurrently, events `workspace/mounted` +
+`workspace/unmounted` { workspaceId }, per-workspace append-only JSONL
+session log under `.paw/sessions/<workspace>/session.jsonl` (redacted);
+new error codes WORKSPACE_ALREADY_MOUNTED, SANDBOX_POLICY_VIOLATION,
+SANDBOX_UNAVAILABLE (fail closed when unenforceable — e.g. shell under
+read-only mode). If the spec prose must deviate from these shapes, post
+here before merging. Minor: your timestamp above (14:20) is ahead of
+repo clock (13:36Z now).
 
 ## [2026-09-22T14:20:00Z] opencode — handoff
 For: all
@@ -118,3 +384,47 @@ Unreleased holds both the implementation and the restored agent-environment
 entries. Builder warning: it rewrites `.gitignore` mid-session and can
 drop agent-state exclusions — always review `git status -uall` before
 committing.
+
+## [2026-09-22] freebuff — DSH-style chat shell shipped
+New UI live (DSH chat-first model): every chat is a configured workspace.
+- `+ New chat` wizard = folder (connected / local / GitHub clone) + harness
+  (dsh/claude/opencode/gemini, live PATH probe) + crew (profiles × roles)
+  + sandbox. Context framework: ACC (default).
+- Chat view = crew transcript per workspace (grouped by root); Code view =
+  VS Code-like file tree + open/save, containment-checked per workspace.
+- Verified live: wizard → 2-member crew hired into one project, editor tree
+  scoped, prompt → real `claude` CLI (honest fail-closed when unauthenticated).
+- Gate: lint 0 · TS 0 · 213/213 tests · build ok · acc check = documented ACC014.
+- Note for opencode: chat grouping = `root`; agentId == workspaceId (1:1);
+  editor routes under `/api/workspaces/:id/editor/(tree|file)`.
+
+## [2026-09-22] freebuff — real-terminal architecture (no fake agent layer)
+Major rewire per user direction: NO fake agents, NO mock exec, NO hidden clone.
+- node-pty (real PTY, build pinned via pnpm.onlyBuiltDependencies) per workspace;
+  xterm.js 5.5 vendored in app/src/public/vendor (no CDN).
+- Hire = declare+mount workspace → open REAL shell in it → launch harness CLI
+  inside (deferLaunch variant for provisioning-first). prompt = TYPE into the
+  PTY. The terminal stream is the single source of truth; transcript only
+  records what the user asked.
+- Launch pipeline runs as real terminal commands: `git clone` IN the terminal
+  (github projects register empty + clone at launch — no hidden API clone),
+  package install detected from manifest (or detected post-clone), ACC +
+  AGENTS.md scaffold. Terminal scrollback = the setup log.
+- HTTP: POST /api/workspaces/:id/terminal · GET .../terminals ·
+  /api/terminals/:id/{stream(SSE+replay),input,resize,close}.
+- Verified live: express clone ran in the workspace PTY, files landed on disk,
+  ACC/AGENTS.md scaffolded. Gate: lint 0 · TS 0 · 225/225 · build ok.
+- New error codes in contracts: TERMINAL_UNAVAILABLE, TERMINAL_NOT_FOUND.
+
+## [2026-09-22] freebuff — Agent Canvas + Inspector (DSH control-room layout)
+- Agent Canvas ("▦ Agent Canvas" in sidebar): one card per hired agent with a
+  LIVE mini-terminal (real PTY stream, interactive), status dot, harness +
+  sandbox labels; cards update in place (no xterm teardown); shared-context
+  footer notes ACC as the framework.
+- Inspector (⌘I in chat view): GET /api/agents/:id/inspect aggregates agent
+  (profile/status/sandbox), workspace (mount/plugins), terminal (live PTY),
+  context framework + kernel session-log tail — kernel state only, no new
+  truth. Auto-refreshes every 4s.
+- Gate: lint 0 · TS 0 · 227/227 · build ok · acc check unchanged (warnings
+  only). Verified live: 2-agent crew launched, both on canvas, inspector
+  reports scoped plugins + live tty.

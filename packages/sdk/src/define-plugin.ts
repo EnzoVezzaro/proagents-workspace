@@ -6,7 +6,7 @@
  * context's service registry; cross-cutting behavior subscribes to typed
  * events. Plugins never import each other (spec section 7).
  */
-import type { PluginManifest, ProviderHealth, WorkspaceConfig } from "@proagents/contracts";
+import type { DevelopmentLifecycle, PluginManifest, ProviderHealth, WorkspaceConfig } from "@proagents/contracts";
 import type { KernelEventBus, Logger, PluginContext, ServiceRegistry } from "@proagents/kernel";
 import type { PermissionFramework } from "@proagents/kernel";
 
@@ -23,6 +23,14 @@ export interface PluginDefinition {
   activate(context: PluginAuthorContext): Promise<void> | void;
   deactivate?(context: PluginAuthorContext): Promise<void> | void;
   health?(): Promise<ProviderHealth>;
+  /**
+   * Lifecycle definition contribution (spec sections 16/146): a plugin with
+   * the `lifecycle` capability returns the definitions it contributes — pure
+   * DATA resolved by the host when building the lifecycle library. The
+   * engine keeps sole authority over execution; contributions cannot inject
+   * behavior.
+   */
+  definitions?(): readonly DevelopmentLifecycle[];
 }
 
 export function definePlugin(definition: PluginDefinition): {
@@ -30,6 +38,7 @@ export function definePlugin(definition: PluginDefinition): {
   activate(context: PluginContext): Promise<void> | void;
   deactivate?(context: PluginContext): Promise<void> | void;
   health?(): Promise<ProviderHealth>;
+  definitions?(): readonly DevelopmentLifecycle[];
 } {
   return definition;
 }

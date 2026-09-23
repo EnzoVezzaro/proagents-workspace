@@ -19,14 +19,16 @@ Owner: proagents-workspace maintainers
 
 ## Inputs
 
-- `README.md` — the canonical product specification (140 numbered sections).
+- `README.md` — the canonical product specification (145 numbered sections).
 - `DISTRIBUTION.md` — the protection & distribution architecture supplement.
+- `PROAGENTS-WORKSPACE-UI.md` — the desktop UI & product architecture supplement (spec section 145).
 - Community feedback, issues, and ecosystem requirements (ProAgents, ACC, Repo Shield, reposell).
 
 ## Outputs
 
 - `docs/` — the published documentation set (concepts, providers, security, CLI reference).
 - The `workspace.yaml` configuration schema (declarative workspace definition).
+- The desktop UI product architecture (`PROAGENTS-WORKSPACE-UI.md`).
 - The `paw` CLI command surface and the `@proagents/workspace` SDK contract.
 
 ## Dependencies
@@ -40,6 +42,7 @@ Owner: proagents-workspace maintainers
 - MUST be runtime-neutral (Docker, E2B, local, future: Kubernetes, Firecracker), repository-neutral (GitHub, GitLab, generic Git), context-neutral (ACC is optional), and agent-neutral (Codex, Claude, OpenCode, Gemini, custom).
 - MUST work without ProAgents and without ACC — the Workspace must be usable as a plain isolated coding environment.
 - MUST NOT solve provider-specific problems in the kernel; the product grows by adding providers, not by increasing core complexity.
+- MUST follow the plugin-first architecture (spec section 146): harnesses, agents, tools, lifecycle definitions, stages, gates, and integrations are plugins; the core provides runtime, contracts, and orchestration only. Consumers resolve plugin declarations (e.g. runtime descriptors) generically — no agent-kind→binary tables, no provider-name switches, no hard-coded stage behavior. Default lifecycles/plugin sets are configuration data, never compiled-in behavior.
 - MUST NOT present local execution as equivalent to a sandbox — the security model must be visible and honestly reported.
 - MUST NOT blindly execute arbitrary install scripts without applying Workspace security policy.
 - MUST NOT store long-lived credentials inside a Workspace image; secrets are injected at runtime and never logged.

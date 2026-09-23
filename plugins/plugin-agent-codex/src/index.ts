@@ -51,10 +51,14 @@ export const codexAgentPlugin = definePlugin({
     name: "Codex Agent",
     version: "0.1.0",
     description: "Codex CLI agent adapter with honest availability detection",
-    capabilities: ["agent"],
+    capabilities: ["agent", "harness"],
     dependencies: [],
     permissions: ["shell"],
     compatibility: { workspaceApi: "^1.0.0", agentContract: "^1.0.0" },
+    // Plugin-first (spec §146) + harness adapter (§144): a Tier-2 process
+    // adapter declares its launch command; honesty about the tier is part
+    // of the contract, so the descriptor exists for catalog resolution.
+    runtime: { kind: "process", command: "codex", label: "Codex" },
   },
   activate(ctx) {
     let counter = 0;

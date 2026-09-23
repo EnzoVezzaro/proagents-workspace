@@ -20,6 +20,10 @@ export interface WorkspaceEventMap {
   "workspace/destroyed": { workspaceId: string };
   "workspace/error": { workspaceId: string; error: WorkspaceErrorShape };
 
+  // multi-workspace isolation (spec section 141): named child workspaces
+  "workspace/mounted": { workspaceId: string };
+  "workspace/unmounted": { workspaceId: string };
+
   // repository
   "repository/connecting": { provider: string; repository: string };
   "repository/cloning": { provider: string; repository: string };
@@ -72,6 +76,30 @@ export interface WorkspaceEventMap {
   // verification
   "verification/started": { commands: readonly string[] };
   "verification/completed": { ok: boolean; durationMs: number };
+
+  // development lifecycle (spec sections 6/16) — per-stage progress of a
+  // workspace's configured lifecycle; `attempt` counts retries from 1.
+  "lifecycle/stage-started": {
+    lifecycleId: string;
+    stageId: string;
+    stageType: string;
+    attempt: number;
+    agentProfileIds: readonly string[];
+    toolIds: readonly string[];
+  };
+  "lifecycle/stage-completed": {
+    lifecycleId: string;
+    stageId: string;
+    ok: boolean;
+    durationMs: number;
+    attempt: number;
+  };
+  "lifecycle/completed": {
+    lifecycleId: string;
+    ok: boolean;
+    durationMs: number;
+    failedStageId?: string;
+  };
 
   // protection (Repo Shield layer)
   "protection/intervened": { operation: string; target: string; action: "allowed" | "blocked" | "requires-approval" };

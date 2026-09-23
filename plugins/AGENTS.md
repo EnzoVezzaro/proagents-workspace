@@ -31,6 +31,7 @@ each other.
 | `runtime-docker` | runtime | 1.0.0 | Isolated containers; honest `unavailable` health when docker is missing; never silently falls back to local exec. |
 | `context-acc` | context | 1.0.0 | Indexes `.acc/` packs; degraded health when `.acc/` is absent. |
 | `agent-codex` | agent | 1.0.0 | Wraps the `codex` CLI; honest availability detection; `AGENT_PROVIDER_UNAVAILABLE` when missing. |
+| `agent-claude` / `agent-opencode` / `agent-gemini` | agent | 1.0.0 | CLI agent adapters from `plugin-agent-cli` — process tier (Tier 2); probes the binary on PATH; `AGENT_PROVIDER_UNAVAILABLE` when missing; fails honestly with the CLI's stderr on a failed run. |
 | `repo-shield` | protection | 1.0.0 | Cross-cutting; subscribes to `command/before` and `filesystem/before-write` and vetoes destructive operations BEFORE execution (spec sections 101–102). |
 
 ## Rules

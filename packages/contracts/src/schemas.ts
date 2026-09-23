@@ -62,6 +62,22 @@ export const pluginManifestSchema = z.object({
   compatibility: z.record(z.string(), semverRangeSchema).default({}),
   /** Optional Zod schema (JSON) for the plugin's configuration section. */
   configurationSchema: z.record(z.string(), z.unknown()).optional(),
+  /**
+   * Runtime descriptor (plugin-first, spec section 146): how this plugin's
+   * capability is materialized OUTSIDE the kernel — e.g. the CLI binary an
+   * agent plugin launches. Declared by the plugin, consumed generically by
+   * the product layer; the kernel never interprets it (no provider logic).
+   */
+  runtime: z
+    .object({
+      /** How the capability runs: a CLI process, an in-process service, … */
+      kind: z.enum(["process", "service", "external"]),
+      /** The launch command / binary (process kind) or service id. */
+      command: z.string().min(1).optional(),
+      /** Human label for catalogs and UI pickers. */
+      label: z.string().optional(),
+    })
+    .optional(),
   /** Runtime requirements. */
   runtimeRequirements: z.object({ node: z.string().optional() }).optional(),
 });
@@ -74,6 +90,153 @@ export type PluginManifest = z.infer<typeof pluginManifestSchema>;
  * with Zod at the boundary (spec section 119).
  */
 export const approvalModeSchema = z.enum(["autonomous", "guarded", "manual"]);
+
+/**
+ * Sandbox policy modes (spec section 142). `workspace-write` is the
+ * backward-compatible default; `read-only` is the recommended mode for
+ * unattended multi-workspace runs (DeepSeek Harness parity, minus its
+ * read-only fail-safe default — documented difference).
+ */
+export const sandboxModeSchema = z.enum([
+  "read-only",
+  "workspace-write",
+  "danger-full-access",
+]);
+
+/** Reusable plugin selection entry (spec sections 59 and 141). */
+const pluginSelectionSchema = z.object({
+  id: z.string().min(1),
+  source: z.string().min(1).optional(),
+  options: z.record(z.string(), z.unknown()).optional(),
+});
+
+/** Reusable agent provider selection (spec sections 30 and 141). */
+const agentSelectionSchema = z.object({
+  provider: z.string().min(1),
+  options: z.record(z.string(), z.unknown()).optional(),
+});
+
+/** Reusable context provider selection (spec sections 27 and 141). */
+const contextSelectionSchema = z.object({
+  providers: z.array(z.string().min(1)).default([]),
+});
+
+/** Sandbox policy for a workspace scope (spec section 142). */
+export const sandboxPolicySchema = z.object({
+  mode: sandboxModeSchema.default("workspace-write"),
+});
+
+// ---------------------------------------------------------------------------
+// Development lifecycle (spec sections 6 and 16): a declarative, composable
+// stage graph a chat/workspace executes instead of one hard-coded loop.
+// ---------------------------------------------------------------------------
+
+/** Coarse stage classes the runner and UI understand natively. */
+export const lifecycleStageTypeSchema = z.enum([
+  "understand",
+  "plan",
+  "implement",
+  "test",
+  "review",
+  "ship",
+  "custom",
+]);
+
+/**
+ * Tool binding for a stage. Tools are references to workspace capabilities
+ * (kernel services / MCP servers), NOT implementations — the kernel stays
+ * free of provider business logic (spec section 139).
+ */
+export const lifecycleToolSchema = z.object({
+  id: z.string().min(1),
+  type: z.enum([
+    "terminal",
+    "filesystem",
+    "git",
+    "browser",
+    "playwright",
+    "vitest",
+    "search",
+    "mcp",
+    "custom",
+  ]),
+  /** Free-form tool configuration (command, engine, MCP server, …). */
+  config: z.record(z.string(), z.unknown()).optional(),
+});
+
+/** Per-stage execution policy. */
+export const lifecycleStagePolicySchema = z.object({
+  /** Stages marked parallel MAY run concurrently with the previous stage. */
+  parallel: z.boolean().default(false),
+  /** A required stage failing fails the lifecycle run. */
+  required: z.boolean().default(true),
+  /** Failure behavior: stop the run, retry the stage, or continue. */
+  onFailure: z.enum(["stop", "retry", "continue"]).default("stop"),
+  /** Retry budget when onFailure is "retry". */
+  maxRetries: z.number().int().min(0).max(10).default(1),
+  /** Wall-clock budget per stage execution in milliseconds. */
+  timeoutMs: z.number().int().min(1000).optional(),
+});
+
+/** One stage of a development lifecycle (spec sections 6/16). */
+export const lifecycleStageSchema = z.object({
+  id: z.string().min(1).regex(/^[a-z][a-z0-9-]*$/, "stage id must be kebab-case"),
+  name: z.string().min(1),
+  type: lifecycleStageTypeSchema,
+  /** Agent profiles bound to this stage (e.g. architect for Plan). */
+  agents: z
+    .array(
+      z.object({
+        profileId: z.string().min(1),
+        role: z.string().optional(),
+        /** Harness kind override (claude/dsh/opencode/…); default per chat. */
+        agentKind: z.string().optional(),
+        /** Prompt/task template injected when the stage starts. */
+        task: z.string().optional(),
+      })
+    )
+    .default([]),
+  tools: z.array(lifecycleToolSchema).default([]),
+  policy: lifecycleStagePolicySchema.prefault({}),
+});
+
+/** A named, reusable development lifecycle (spec sections 6/16). */
+export const developmentLifecycleSchema = z.object({
+  id: z.string().min(1).regex(/^[a-z][a-z0-9-]*$/, "lifecycle id must be kebab-case"),
+  name: z.string().min(1),
+  description: z.string().optional(),
+  stages: z.array(lifecycleStageSchema).min(1),
+});
+
+/** Lifecycle library + the default a workspace uses (spec sections 6/16). */
+export const lifecycleConfigSchema = z.object({
+  /** Named lifecycles reusable across chats/workspaces. */
+  definitions: z.array(developmentLifecycleSchema).default([]),
+  /** Which definition a chat/workspace runs when none is specified. */
+  default: z.string().optional(),
+});
+
+/**
+ * Named child workspace entry (spec section 141): an isolated plugin scope
+ * with its own filesystem root, sandbox policy, and optional provider
+ * selection overrides. Keys are kebab-case workspace ids.
+ */
+export const workspaceEntrySchema = z.object({
+  root: z.string().min(1),
+  sandbox: sandboxPolicySchema.optional(),
+  plugins: z.array(pluginSelectionSchema).optional(),
+  agent: agentSelectionSchema.optional(),
+  context: contextSelectionSchema.optional(),
+  /** Development lifecycle executed in this workspace (spec sections 6/16). */
+  lifecycle: z
+    .object({
+      /** Reference to a named definition in the top-level lifecycle config. */
+      ref: z.string().optional(),
+      /** Inline lifecycle overriding the referenced definition. */
+      inline: developmentLifecycleSchema.optional(),
+    })
+    .optional(),
+});
 
 export const networkModeSchema = z.enum([
   "allowlist",
@@ -107,17 +270,8 @@ export const workspaceConfigSchema = z.object({
       options: z.record(z.string(), z.unknown()).optional(),
     })
   ).optional(),
-  context: z
-    .object({
-      providers: z.array(z.string().min(1)).default([]),
-    })
-    .optional(),
-  agent: z
-    .object({
-      provider: z.string().min(1),
-      options: z.record(z.string(), z.unknown()).optional(),
-    })
-    .optional(),
+  context: contextSelectionSchema.optional(),
+  agent: agentSelectionSchema.optional(),
   tools: z.array(z.string()).optional(),
   network: z
     .object({
@@ -190,13 +344,12 @@ export const workspaceConfigSchema = z.object({
         .default([])
     })
     .optional(),
-  plugins: z
-    .array(
-      z.object({
-        id: z.string().min(1),
-        source: z.string().min(1).optional(),
-        options: z.record(z.string(), z.unknown()).optional(),
-      })
+  plugins: z.array(pluginSelectionSchema).optional(),
+  lifecycle: lifecycleConfigSchema.optional(),
+  workspaces: z
+    .record(
+      z.string().regex(/^[a-z][a-z0-9-]*$/, "workspace name must be kebab-case"),
+      workspaceEntrySchema
     )
     .optional(),
 });
@@ -205,3 +358,13 @@ export type WorkspaceConfig = z.infer<typeof workspaceConfigSchema>;
 
 export type NetworkMode = z.infer<typeof networkModeSchema>;
 export type ApprovalMode = z.infer<typeof approvalModeSchema>;
+export type SandboxMode = z.infer<typeof sandboxModeSchema>;
+export type SandboxPolicy = z.infer<typeof sandboxPolicySchema>;
+export type WorkspaceEntry = z.infer<typeof workspaceEntrySchema>;
+export type LifecycleStageType = z.infer<typeof lifecycleStageTypeSchema>;
+export type LifecycleTool = z.infer<typeof lifecycleToolSchema>;
+export type LifecycleStagePolicy = z.infer<typeof lifecycleStagePolicySchema>;
+export type LifecycleStageAgent = z.infer<typeof lifecycleStageSchema>["agents"][number];
+export type LifecycleStage = z.infer<typeof lifecycleStageSchema>;
+export type DevelopmentLifecycle = z.infer<typeof developmentLifecycleSchema>;
+export type LifecycleConfig = z.infer<typeof lifecycleConfigSchema>;

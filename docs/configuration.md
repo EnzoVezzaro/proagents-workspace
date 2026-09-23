@@ -188,3 +188,54 @@ workspace:
       - filesystem
       - git
 ```
+
+## Named workspaces (multi-workspace isolation)
+
+One Workspace process can host several **named workspaces** at once — each an isolated plugin scope with its own root, sandbox policy, session log, and plugin selections (spec section 141). Declare them under the optional `workspaces:` map; keys are kebab-case workspace ids:
+
+```yaml
+workspaces:
+  frontend:
+    root: ./projects/frontend
+    sandbox:
+      mode: read-only
+  backend:
+    root: ./projects/backend
+    sandbox:
+      mode: workspace-write
+    agent:
+      provider: codex
+```
+
+- A capability is instantiated independently per workspace; scopes fall through to the root registry for anything they did not register.
+- The `root` must exist on disk before the workspace can be mounted; grants come from this validated configuration, never from a plugin.
+- Mount/unmount is a runtime operation; only declared workspaces can be mounted, so a running process stays reconstructable from configuration alone.
+
+Each entry may set a sandbox `mode` — `read-only`, `workspace-write` (default), or `danger-full-access` (spec section 142). The sandbox is same-world confinement, honestly reported: `read-only` vetoes writes before execution, and a host-process shell fails closed with `SANDBOX_UNAVAILABLE` under `read-only` because it cannot enforce read-only confinement. Every workspace also keeps an append-only session log (spec section 143) under `.paw/sessions/<workspace>/session.jsonl`, redacted at write time.
+
+### Development lifecycle per workspace (spec sections 6/16)
+
+A workspace entry may bind the development lifecycle it runs — by reference to a named definition, or inline (see [Development Lifecycle](lifecycle.md) for the full stage model and execution semantics):
+
+```yaml
+lifecycle:
+  definitions:
+    - id: web-app
+      name: Web application lifecycle
+      stages:
+        - { id: implement, name: Implement, type: implement,
+            agents: [{ profileId: nodejs-engineer }],
+            tools: [{ id: terminal, type: terminal }],
+            policy: { required: true, onFailure: stop } }
+        - { id: test, name: Test, type: test,
+            tools: [{ id: vitest, type: vitest }],
+            policy: { required: false, onFailure: continue } }
+  default: web-app
+
+workspaces:
+  flight-booking:
+    root: agents/flight-booking
+    lifecycle: { ref: web-app }   # or lifecycle.inline: { ... }
+```
+
+Resolution order: `lifecycle.inline` → `lifecycle.ref` → top-level `lifecycle.default`; an unknown ref is a structured `CONFIG_INVALID` error. Stage progress is emitted as `lifecycle/*` events on the typed bus.

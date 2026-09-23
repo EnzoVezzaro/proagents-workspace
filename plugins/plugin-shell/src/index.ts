@@ -38,6 +38,12 @@ export const shellPlugin = definePlugin({
     compatibility: { workspaceApi: "^1.0.0", shellContract: "^1.0.0" },
   },
   activate(ctx) {
+    // Sandbox policy of THIS plugin instance's workspace scope (spec 142).
+    // A host-process shell CANNOT enforce read-only confinement (same-world
+    // caveat), so under read-only it fails CLOSED with SANDBOX_UNAVAILABLE
+    // instead of running unconfined — never silently.
+    const sandbox = ctx.sandbox;
+
     const provider: ShellProvider = {
       name: "shell",
       contractVersion: "1.0.0",
@@ -53,6 +59,18 @@ export const shellPlugin = definePlugin({
         };
       },
       async exec(request) {
+        if (sandbox === "read-only") {
+          throw new WorkspaceError({
+            code: "SANDBOX_UNAVAILABLE",
+            message: `Shell execution is unavailable under the read-only sandbox policy: a host-process shell cannot enforce read-only confinement.`,
+            provider: "shell",
+            recoverable: false,
+            suggestions: [
+              "Set sandbox.mode: workspace-write on the workspace entry",
+              "Use a filesystem-only agent flow for read-only workspaces",
+            ],
+          });
+        }
         ctx.permissions.require({ pluginId: "shell", category: "shell" });
         const started = Date.now();
         // Protection & policy veto BEFORE execution (spec sections 101–102).

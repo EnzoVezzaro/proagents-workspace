@@ -1,0 +1,76 @@
+#!/usr/bin/env bash
+# paw-ui — launch ProAgents Workspace as a DESKTOP APP window (not a tab).
+#
+# Uses Chrome app-mode: no browser chrome, its own Dock presence, its own
+# profile (isolated from your normal browsing), fixed as a real app window.
+# This is the same technique DSH's desktop shell uses on machines without a
+# bundling step — a native window around a local kernel UI.
+#
+# Usage:
+#   bin/paw-ui                 # start server if needed, open the app window
+#   bin/paw-ui --dev           # dev mode: tsx watch + auto-reload on save
+#   PAW_UI_PORT=4700 bin/paw-ui
+#
+# Env:
+#   PAW_UI_BASE_DIR   workspace base dir (default: ~/ProAgents)
+#   PAW_PLUGINS       kernel plugins (default: filesystem,shell,git)
+#   PAW_GITHUB_TOKEN  used only by the git clone path, never logged
+set -euo pipefail
+
+DEV_MODE=0
+[ "${1:-}" = "--dev" ] && DEV_MODE=1
+
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+PORT="${PAW_UI_PORT:-4600}"
+URL="http://127.0.0.1:${PORT}"
+export PAW_UI_BASE_DIR="${PAW_UI_BASE_DIR:-$HOME/ProAgents}"
+export PAW_PLUGINS="${PAW_PLUGINS:-filesystem,shell,git}"
+mkdir -p "$PAW_UI_BASE_DIR"
+
+# 1. Server up (idempotent).
+if ! curl -s -o /dev/null -m 2 "$URL/api/health"; then
+  if [ "$DEV_MODE" = "1" ]; then
+    echo "● starting ProAgents Workspace in DEV mode (tsx watch) on $URL …"
+    (cd "$HERE/app" && PAW_UI_PORT="$PORT" nohup pnpm dev > "$PAW_UI_BASE_DIR/.server.log" 2>&1 &)
+  else
+    echo "● starting ProAgents Workspace kernel on $URL …"
+    if [ -f "$HERE/app/dist/server.js" ]; then
+      (nohup node "$HERE/app/dist/server.js" > "$PAW_UI_BASE_DIR/.server.log" 2>&1 &)
+    else
+      echo "  building once (first run)…"
+      (cd "$HERE" && pnpm build > /dev/null 2>&1)
+      (nohup node "$HERE/app/dist/server.js" > "$PAW_UI_BASE_DIR/.server.log" 2>&1 &)
+    fi
+  fi
+  for _ in $(seq 1 60); do
+    curl -s -o /dev/null -m 1 "$URL/api/health" && break
+    sleep 0.5
+  done
+elif [ "$DEV_MODE" = "1" ]; then
+  echo "● server already running on $URL (kill it first for dev mode: pkill -f 'tsx watch')"
+fi
+
+# 2. Open as a real desktop window (Chrome app-mode; falls back to default browser).
+CHROME=""
+for c in \
+  "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
+  "/Applications/Chromium.app/Contents/MacOS/Chromium" \
+  "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge" \
+  "$(command -v google-chrome-stable 2>/dev/null || true)" \
+  "$(command -v chromium 2>/dev/null || true)"; do
+  [ -n "$c" ] && [ -x "$c" ] && CHROME="$c" && break
+done
+
+if [ -n "$CHROME" ]; then
+  PROFILE="$HOME/.proagents/desktop-profile"
+  mkdir -p "$PROFILE"
+  echo "● opening desktop window: $URL"
+  exec "$CHROME" --app="$URL" \
+    --user-data-dir="$PROFILE" \
+    --window-size=1560,980 \
+    --class=proagents-workspace \
+    --name=proagents-workspace >/dev/null 2>&1 &
+else
+  echo "● no Chromium browser found — opening in the default browser"
+  if command -v open >/dev/null 2>&1; then open "$URL"; else echo "open $URL manually"; fi
+fi

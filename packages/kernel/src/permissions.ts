@@ -80,12 +80,37 @@ export class PermissionFramework {
   private readonly grants = new Map<string, Set<string>>();
   private readonly config: WorkspaceConfig;
   private readonly approvalFlow: ApprovalFlow;
+  /**
+   * Extra filesystem scopes granted by a NAMED WORKSPACE ENTRY (spec section
+   * 141). These come from the validated workspace.yaml `workspaces:` map —
+   * still declarative configuration, never plugin self-grants.
+   */
+  private readonly extraFsScopes?: { read: readonly string[]; write: readonly string[] };
 
-  constructor(config: WorkspaceConfig, approvalFlow: ApprovalFlow = new HeadlessApprovalFlow()) {
+  constructor(
+    config: WorkspaceConfig,
+    approvalFlow: ApprovalFlow = new HeadlessApprovalFlow(),
+    extraFsScopes?: { read: readonly string[]; write: readonly string[] }
+  ) {
     this.config = config;
     this.approvalFlow = approvalFlow;
+    this.extraFsScopes = extraFsScopes;
     // Effective grants come from the configuration (declarative), merged with
     // plugin manifest requests at load time via grantPlugin().
+  }
+
+  /**
+   * A permission framework for plugins activating INTO a named workspace
+   * whose filesystem root is `root` (declared in the workspace entry). The
+   * returned framework shares the approval flow and adds the declared root
+   * to the grantable filesystem scopes.
+   */
+  forWorkspaceRoot(root: string): PermissionFramework {
+    return new PermissionFramework(
+      this.config,
+      this.approvalFlow,
+      { read: [root], write: [root] }
+    );
   }
 
   /** Record the permissions requested by a plugin manifest, intersected with config grants. */
@@ -126,9 +151,13 @@ export class PermissionFramework {
     const fs = /^filesystem:(read|write):(.+)$/.exec(permission);
     if (fs) {
       const scope = fs[2] as string;
-      const list = fs[1] === "read"
-        ? (this.config.permissions?.filesystem?.read ?? [])
-        : (this.config.permissions?.filesystem?.write ?? []);
+      const list = [
+        ...(fs[1] === "read"
+          ? (this.config.permissions?.filesystem?.read ?? [])
+          : (this.config.permissions?.filesystem?.write ?? [])),
+        // Named-workspace roots are declared configuration (spec 141).
+        ...((fs[1] === "read" ? this.extraFsScopes?.read : this.extraFsScopes?.write) ?? []),
+      ];
       // The requested SCOPE must be INSIDE a granted scope — never a suffix
       // match: granting /workspace/repo must not cover /etc/workspace/repo.
       // The scope `list` items are the granted prefixes; we must only grant

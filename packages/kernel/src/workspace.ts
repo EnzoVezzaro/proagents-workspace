@@ -25,6 +25,12 @@ export interface WorkspaceOptions {
   logSink?: (record: import("@proagents/contracts").LogRecord) => void;
   /** Approval flow for guarded/manual modes; defaults to fail-closed headless. */
   approvalFlow?: ApprovalFlow;
+  /**
+   * Sandbox policy for the PARENT workspace itself (spec section 142).
+   * Named workspaces declare their mode in their entry; the parent declares
+   * it at creation. Undefined = no policy declared (no sandbox veto).
+   */
+  sandbox?: import("@proagents/contracts").SandboxMode;
 }
 
 export interface PluginRuntime {
@@ -43,6 +49,8 @@ export class Workspace {
   readonly config: WorkspaceConfig;
   readonly permissions: PermissionFramework;
   readonly logger: Logger;
+  /** Sandbox policy of the parent workspace (undefined = none declared). */
+  readonly sandbox?: import("@proagents/contracts").SandboxMode;
 
   private readonly loader = new PluginLoader();
   private readonly plugins: WorkspacePlugin[] = [];
@@ -51,10 +59,12 @@ export class Workspace {
 
   private constructor(
     config: WorkspaceConfig,
-    logSink?: (record: import("@proagents/contracts").LogRecord) => void
+    logSink?: (record: import("@proagents/contracts").LogRecord) => void,
+    sandbox?: import("@proagents/contracts").SandboxMode
   ) {
     this.config = config;
     this.logSink = logSink;
+    this.sandbox = sandbox;
     this.logger = new StructuredLogger(logSink ? [logSink] : [], {}, "info");
     this.permissions = new PermissionFramework(config);
   }
@@ -73,7 +83,7 @@ export class Workspace {
         details: { issues: parsed.error.issues },
       });
     }
-    const workspace = new Workspace(parsed.data, options.logSink);
+    const workspace = new Workspace(parsed.data, options.logSink, options.sandbox);
     // The declared `workspaceApi` range must be satisfiable by this kernel
     // before anything else runs (spec section 120).
     if (parsed.data.workspaceApi !== undefined && !satisfiesRange(WORKSPACE_API_VERSION, parsed.data.workspaceApi)) {
@@ -158,6 +168,8 @@ export class Workspace {
         const declared = (this.config.plugins ?? []).find((p) => p.id === pluginId);
         return declared?.options ?? {};
       },
+      sandbox: this.sandbox,
+      workspaceRoot: undefined,
     };
     this.logger.debug("plugin/activating", { provider: pluginId });
     // Grant the manifest's declared permissions BEFORE activation so plugins

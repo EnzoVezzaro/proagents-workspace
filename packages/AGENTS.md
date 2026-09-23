@@ -26,6 +26,7 @@ Owner: proagents-workspace maintainers
 | `packages/kernel` | `@proagents/kernel` | Event bus, service + capability registries, plugin discovery/dependency resolution, lifecycle state machine, permission framework, command registry, health aggregation, structured logging. **No provider-specific logic.** |
 | `packages/sdk` | `@proagents/workspace` | The authoring surface: `definePlugin`, `WorkspaceClient`. Re-exports contracts + kernel. Everything plugins depend on. |
 | `packages/cli` | `proagents-workspace` (binary `paw`) | Thin CLI over the SDK: `doctor`, `plugin list`, `service list`, `config show`, `verify`. `--json` everywhere, `--headless` fails closed. |
+| `app/` | `@proagents/ui` | Control-room server + single-page UI (PROAGENTS-WORKSPACE-UI.md MVP). Boots the real kernel via the SDK with the bundled plugin catalog; a projection over kernel events/session logs (spec §145) — no enforcement logic of its own. |
 
 ## Invariants (kernel purity, spec section 139)
 

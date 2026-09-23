@@ -3,7 +3,9 @@
 > Status: implemented in this repository (`packages/` + `plugins/`), versioned
 > as 0.1.0. This page describes the working TypeScript implementation of the
 > architecture in [Architecture](./architecture.md); the canonical product
-> specification remains `README.md`.
+> specification remains `README.md`. The planned desktop UI above this kernel
+> is specified in [PROAGENTS-WORKSPACE-UI.md](../PROAGENTS-WORKSPACE-UI.md)
+> (spec section 145).
 
 The Workspace ships as a **small kernel plus plugins**. The kernel contains no
 provider-specific logic — every runtime, repository, context, agent, and
@@ -94,16 +96,44 @@ Rules the kernel enforces for every plugin:
 4. **One provider per capability** — a second registration of the same
    service id fails with `SERVICE_ALREADY_REGISTERED`.
 
+## Multi-workspace, sandbox, session log
+
+The kernel implements multi-workspace isolation, sandbox policy, and the
+per-workspace session log (spec sections 141–143):
+
+- `ScopedServiceRegistry` / `ShadowingServiceRegistry` — one capability
+  instantiated independently per named workspace; scopes shadow the root
+  and fall through for anything unregistered (the Cordis `ctx.isolate()`
+  counterpart).
+- `WorkspaceManager` — mounts N named workspaces concurrently from the
+  `workspaces:` map; each scope gets its own registry view, sandbox mode,
+  session log, and plugin activation; unmount disposes exactly that scope.
+- `SessionLog` — append-only JSONL per workspace under
+  `.paw/sessions/<workspace>/session.jsonl`, redacted at write time.
+- Sandbox modes `read-only` / `workspace-write` (default) /
+  `danger-full-access`: `filesystem` vetoes writes under `read-only`
+  before the before-write event (`SANDBOX_POLICY_VIOLATION`); `shell`
+  fails closed with `SANDBOX_UNAVAILABLE` under `read-only` because a
+  host-process shell cannot enforce read-only confinement — honestly
+  reported, never silently downgraded.
+
+The harness adapter contract (`HarnessProvider`, tiers `native`/`process`,
+normalized `session/*` / `model/*` / `compaction/*` events) is typed in
+`@proagents/contracts` (spec section 144); adapters are plugins — the
+kernel knows only the contract.
+
 ## Verification
 
 ```bash
 pnpm lint && pnpm typecheck && pnpm test && pnpm build
 ```
 
-The suite includes per-plugin contract tests (guards, honesty, veto chains)
-and an integration test that walks the full lifecycle flow from the
-specification: local runtime → clone → context → edit → test → commit →
-guarded push, with Repo Shield vetoing destructive operations in-band.
+The suite includes per-plugin contract tests (guards, honesty, veto chains),
+kernel multi-workspace tests (scoped resolution, concurrent mounts, sandbox
+resolution and vetoes, session log), and an integration test that walks the
+full lifecycle flow from the specification: local runtime → clone → context →
+edit → test → commit → guarded push, with Repo Shield vetoing destructive
+operations in-band.
 
 ## See also
 

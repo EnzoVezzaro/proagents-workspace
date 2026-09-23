@@ -4835,3 +4835,41 @@ Normative points that bind the UI to this spec:
 - Terminal ownership, agent attribution of file changes, and approvals surface the kernel's permission and protection events (sections 101–102) — the UI informs, the kernel enforces.
 
 The UI spec's engineering decisions (component tree, state models, Tauri process architecture) may evolve without changing this document; this section pins only the boundary that keeps the UI honest.
+
+---
+
+# 146. Plugin-First Architecture
+
+The Workspace follows a **DeepSeek-Harness-inspired plugin architecture**. The governing principle is normative:
+
+> **Everything that can be replaced, extended, configured, or composed is a plugin.** The core provides the runtime and contracts — plugin loading, lifecycle orchestration, events, permissions, persistence, and the workspace model — never hard-coded development behavior.
+
+This section generalizes what sections 9, 59, and 139 already established, and binds every future capability to it.
+
+## Core vs. plugins
+
+The kernel and product core own exactly:
+
+- Plugin discovery, validation, loading, and the activation lifecycle (section 59)
+- The capability contracts and service registry (section 9)
+- The lifecycle engine: stage sequencing, policies, transitions, events (sections 6, 16)
+- The event bus, permission framework, approval policy, session log, workspace isolation (sections 7, 34, 141–143)
+- The runtime, execution, and artifact management surfaces
+
+Everything else — harnesses, agents, tools, lifecycle definitions, stages, gates, context providers, integrations, UI capabilities — is a plugin. Adding a new AI harness, agent, model provider, browser, test runner, MCP server, development stage, deployment provider, or workflow **must not require changing the core**.
+
+## Declarations, not switches
+
+Plugins declare what they need and how they run; consumers resolve declarations generically. Concretely:
+
+- A plugin manifest may carry a **runtime descriptor** (`kind`: process | service | external, `command`, `label`) describing how the capability materializes outside the kernel. The agent plugins declare their CLI binary this way; launch flows read the descriptor from the plugin catalog — they never maintain an agent-kind→binary table.
+- The lifecycle engine never branches on a specific provider (`if harness === "opencode"`, `if stage === "testing"`). It resolves stages, agents, tools, and gates by id through the registry and executes them through the contracts.
+- Product layers MAY ship **default configuration data** (a default lifecycle, a default plugin set), but defaults are data — declarative, overridable per workspace — never compiled-in behavior.
+
+## The lifecycle engine remains the authority
+
+Plugin-first does not mean plugins control execution. Plugins **provide capabilities**; the core lifecycle engine decides which stage runs, which plugins are available to it, which tools are granted, when execution starts and stops, whether a transition is valid, whether a gate passed, whether a failure retries, and whether the run can ship. A plugin cannot bypass lifecycle policy; protection and permission intervention (sections 101–102, 34) apply to plugin execution unchanged.
+
+## Architectural test
+
+For every new capability, ask: *can this be a plugin?* If yes, implement it as a plugin. If it must be core infrastructure, document why in this spec or in `docs/architecture.md` — an undocumented exception is a violation, not a precedent.

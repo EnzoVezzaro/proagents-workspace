@@ -42,6 +42,18 @@ export interface PluginContext {
   readonly permissions: import("./permissions.js").PermissionFramework;
   /** Plugin-specific configuration section from workspace.yaml. */
   pluginOptions(): Record<string, unknown>;
+  /**
+   * Sandbox policy mode of the workspace scope this plugin instance runs in
+   * (spec section 142). For the parent workspace this comes from
+   * `WorkspaceOptions.sandbox`; for named scopes, from the workspace entry.
+   * Undefined = no policy declared (no veto is applied).
+   */
+  readonly sandbox?: import("@proagents/contracts").SandboxMode;
+  /**
+   * Absolute filesystem root of the named workspace scope this plugin
+   * instance runs in (spec section 141). Undefined outside a named scope.
+   */
+  readonly workspaceRoot?: string;
 }
 
 export interface DiscoveredPlugin {
