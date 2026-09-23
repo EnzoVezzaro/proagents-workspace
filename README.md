@@ -1,5 +1,7 @@
 # ProAgents Workspace
 
+🚧 **Work in Progress**
+
 ## The programmable workspace for AI agents
 
 ProAgents Workspace is an open-source, agent-first execution environment where AI agents can work on real software.
@@ -4715,3 +4717,121 @@ The developer can inspect everything.
 The Workspace can reproduce the environment.
 
 And ProAgents can later provide the professional layer on top.
+
+---
+
+# 141. Multi-Workspace Isolation
+
+A single Workspace process can host multiple **named workspaces** at once. Each named workspace is an isolated plugin scope: its own service registrations, its own filesystem root, its own sandbox policy, and its own session log — so several projects can run independent agents simultaneously without sharing capability state.
+
+Named workspaces are declared in `workspace.yaml` under the optional `workspaces:` map. Keys are kebab-case workspace ids; each entry declares a `root` (required, relative to the configuration file) and may override the sandbox mode, plugin selections, agent provider, and context providers:
+
+```yaml
+workspaces:
+  frontend:
+    root: ./projects/frontend
+    sandbox:
+      mode: read-only
+  backend:
+    root: ./projects/backend
+    sandbox:
+      mode: workspace-write
+    agent:
+      provider: codex
+```
+
+Isolation semantics:
+
+- **Scoped service resolution.** The kernel's scoped registry holds a root registry plus one scope per mounted workspace. A capability (filesystem, runtime, agent, …) is instantiated independently per scope; a scope's registration shadows the root, and resolution falls through to the root for ids the scope did not register. Uniqueness of a capability is decided per scope — two workspaces never collide with each other.
+- **Declarative roots.** A workspace root must exist on disk before it can be mounted; mounting fails with `WORKSPACE_INVALID_STATE` otherwise. The root is also the boundary of the scope's filesystem grants — grants come from the validated configuration, never from a plugin's own request.
+- **Configuration-reconstructable.** Only workspaces declared in `workspace.yaml` can be mounted (`WORKSPACE_NOT_FOUND` otherwise). A running process with all its mounted workspaces is reconstructable from configuration alone.
+- **Mount/unmount lifecycle.** Mounting validates the entry, resolves the sandbox mode, opens the session log, and activates the workspace's plugins into its scope (`workspace/mounted`). Unmounting deactivates those plugins in reverse order and disposes exactly that scope (`workspace/unmounted`); the parent workspace and other workspaces keep running. Remounting the same id afterwards starts from a clean scope.
+- **Shared event bus.** All scopes emit on one typed event bus, so protection (Repo Shield) covers every workspace. Lifecycle payloads carry the `workspaceId` where the event contract defines one.
+
+Honest comparison: DeepSeek Harness groups directories for UX and isolates execution through its sandbox; its workspace registry is not a security boundary. The Workspace draws the same line — named workspaces isolate service state and configuration, while the sandbox policy (section 142) and permission grants (section 34) remain the enforcement layers.
+
+---
+
+# 142. Sandbox Policy
+
+Every workspace — the parent and each named workspace — may declare a sandbox policy:
+
+```yaml
+sandbox:
+  mode: workspace-write
+```
+
+Modes, in increasing permissiveness:
+
+| Mode | Behavior |
+|---|---|
+| `read-only` | No filesystem writes, no deletions. |
+| `workspace-write` (default) | Writes confined to the workspace root. |
+| `danger-full-access` | Unconfined; explicit opt-in. |
+
+The default is `workspace-write` for backward compatibility with existing workspace configurations. For unattended multi-workspace runs, `read-only` is the recommended mode. (DeepSeek Harness defaults to `read-only`; the difference is deliberate and documented here.)
+
+The sandbox is **same-world confinement**: a process still shares the host kernel and filesystem. It is not a virtual machine, container, or microVM. When the whole environment must be isolated, use a runtime provider that provides real isolation (section 20). This limitation is always reported honestly — never silently downgraded.
+
+Fail-closed semantics:
+
+- A write or deletion under `read-only` is vetoed **before** execution with `SANDBOX_POLICY_VIOLATION` — before any byte is touched and before the `filesystem/before-write` protection event fires.
+- A host-process shell **cannot** enforce `read-only` confinement (any spawned command could write). Under `read-only`, shell execution therefore fails closed with `SANDBOX_UNAVAILABLE` instead of running unconfined.
+- A policy that cannot be enforced by a capability is an error, never a silent downgrade.
+
+Named workspaces resolve their mode from the workspace entry; the parent workspace declares its own mode at creation. An explicit override may be supplied by the operator at mount time.
+
+---
+
+# 143. Session Log
+
+Every named workspace keeps an **append-only session log** — the record of what the agent saw and did, written before anything else consumes it. The log is one JSONL file per workspace, under the Workspace metadata tree (`.paw/sessions/<workspace>/session.jsonl`).
+
+Properties:
+
+- **Append-only.** Records are never rewritten or deleted in place. Resume, fork, search, and replay operate on the same stream.
+- **Structured.** Each entry carries a timestamp, workspace id, session id, a structured kind (`agent/prompt`, `tool/result`, `workspace/event`, …), the provider, and data fields.
+- **Redacted at write time.** The same redaction rules as structured logging (section 100) apply before a record reaches the disk — secrets never enter the log.
+- **Bounded reads.** Readers take a bounded tail; nothing requires loading the whole history.
+
+The session log is the substrate for resume and replay. A future provider may implement fork (a new session seeded from a past log) on the same format.
+
+---
+
+# 144. Harness Adapters
+
+The Workspace is the policy and verification backend for coding harnesses (OpenCode, Codex, Claude Code, Gemini CLI, custom). A **harness adapter** is a capability plugin (`HarnessProvider`) that attaches the Workspace to a host harness so Workspace events and decisions reach the harness lifecycle — and so the harness's own activity becomes observable here.
+
+Integration tiers, reported honestly:
+
+- **`native`** — the harness exposes a plugin/hook surface (for example Codex plugin-bundled `hooks/hooks.json` with blocking `PreToolUse`, or the OpenCode plugin API). Decisions can veto before execution.
+- **`process`** — the adapter launches the harness as a child process. Enforcement is advisory and observability is reduced. A `process` adapter must report `process` — it can never claim `native`.
+
+The adapter surface is deliberately small: detect availability, `attach` (install native hooks or spawn the child), `detach` (idempotent), and `enforce` — push a Workspace decision onto the harness and receive a `HarnessEnforcement` result that states whether the decision was actually applied and whether enforcement is `blocking` or `advisory`. An adapter never claims a block it did not enforce.
+
+Normalized harness-side lifecycle events flow through the typed event bus so the rest of the Workspace can subscribe without knowing the harness:
+
+```text
+session/starting · session/started · session/stopping · session/stopped
+model/before   · model/after     · model/error
+compaction/planned · compaction/started · compaction/completed
+```
+
+`model/before` is awaited: a subscriber can veto a model call before it happens, exactly as `command/before` vetoes a shell command (sections 101–102).
+
+Kernel purity (section 139) applies unchanged: adapters are plugins, the kernel knows only the contract. Intercepting the harness lifecycle — never the harness process or binaries — keeps the arrangement portable across harnesses and safe across harness upgrades.
+
+---
+
+# 145. Desktop UI — Product Specification Pointer
+
+The Workspace's desktop application (shell, layout, agent runtimes, terminals, trajectory, cross-harness view) is specified in **`PROAGENTS-WORKSPACE-UI.md`** — the canonical UI product specification, structured like `DISTRIBUTION.md` as a supplement to this document.
+
+Normative points that bind the UI to this spec:
+
+- The UI is a **projection** over kernel events and the session log (sections 143, 26–27 of the UI spec). React/UI state is never the source of truth.
+- Every visible runtime maps to a real `AgentRuntime` built on the kernel's contracts — `HarnessProvider` (section 144), workspace isolation (section 141), and sandbox policy (section 142) apply unchanged under the UI.
+- The UI adapts to `HarnessProvider` **capabilities** (native vs process tier, enforcement blocking vs advisory) and reports that tier honestly — no adapter surface appears in the UI that the underlying harness cannot actually provide.
+- Terminal ownership, agent attribution of file changes, and approvals surface the kernel's permission and protection events (sections 101–102) — the UI informs, the kernel enforces.
+
+The UI spec's engineering decisions (component tree, state models, Tauri process architecture) may evolve without changing this document; this section pins only the boundary that keeps the UI honest.
