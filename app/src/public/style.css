@@ -45,6 +45,9 @@ body { margin: 0; background: var(--bg); color: var(--text); font: 13.5px/1.5 -a
 .status-dot.hired { background: var(--accent); }
 .status-dot.working { background: var(--ok); animation: pulse 1.2s infinite; }
 .status-dot.stopped { background: var(--err); }
+.status-dot.settled { background: var(--muted, #8b93a7); }
+#chat-list li.settled { opacity: 0.6; }
+.settled-badge { font-size: 10px; color: var(--muted, #8b93a7); border: 1px solid var(--muted, #8b93a7); border-radius: 3px; padding: 0 4px; margin-left: 4px; }
 @keyframes pulse { 50% { opacity: .35; } }
 
 /* ============ main / chat ============ */

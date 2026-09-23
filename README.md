@@ -4873,3 +4873,43 @@ Plugin-first does not mean plugins control execution. Plugins **provide capabili
 ## Architectural test
 
 For every new capability, ask: *can this be a plugin?* If yes, implement it as a plugin. If it must be core infrastructure, document why in this spec or in `docs/architecture.md` — an undocumented exception is a violation, not a precedent.
+
+---
+
+# 147. Chat Workspaces — Isolation, Materialization, Retirement
+
+Every chat is an isolated environment. The governing rule is normative:
+
+> **A chat owns a workspace; a workspace never becomes shared.** Each chat creates its own NEW, EMPTY workspace directory and any project it names is MATERIALIZED INTO that directory. Two chats never map to the same directory, and no chat works in place inside a project, another chat, or the user's own checkout. Sharing is explicit (section 36 of the UI spec) — never the silent default.
+
+## Layout
+
+Chat workspaces live under a per-machine base directory:
+
+```text
+<base>/
+  chats/<chat-id>/     # one directory per chat — unique per run
+  repos/               # DELETED as a concept: no shared clone targets
+  .paw/sessions/       # per-chat append-only session logs (section 143)
+```
+
+`<chat-id>` = sanitized name + random suffix, so two chats with the same display name still never collide. The first crew member's agent id EQUALS the workspace id (1:1, section 141); additional crew members join the same chat workspace under suffixed ids.
+
+## Materialization
+
+The wizard's project step chooses what is materialized INTO the fresh workspace. All three paths run as real, visible commands in the chat's terminal — never hidden API work:
+
+- **Empty workspace (default).** No project. A blank environment the crew fills.
+- **GitHub repo → per-chat clone.** `git clone <url> .` inside the chat's workspace. Each chat gets its own clone; there is no shared clone directory anymore.
+- **Local folder → per-chat worktree or copy.** A local GIT repository is attached with `git worktree add -b <per-chat-branch>` — a linked worktree: instant, space-efficient, one object store, the source repo keeps its own branch untouched (T3-Code-inspired). A non-git folder is copied with a `tar` pipe that excludes state directories (`node_modules/`, `dist/`, `coverage/`, `.git/`, `.paw/`, `.acc/`) — a chat inherits the project's CODE, never another environment's STATE.
+
+## The project catalog is declarative
+
+Connected projects are SOURCE records (id, name, repo, origin), not directories. Registration creates no directories, binds no roots, and refuses chat workspace directories as sources. Resolving a project for a chat always materializes fresh content into that chat's workspace.
+
+## Retirement: settle and purge
+
+- **Settle** marks finished work out of the active list and destroys nothing — the workspace, session log, and worktree stay on disk and the chat can resume. Settled is not stopped.
+- **Purge** deletes the chat's workspace directory for good. It is GUARDED: uncommitted tracked changes or non-ignored untracked files refuse the purge (the error states that nothing was deleted); an explicit force destroys the work and reports what was destroyed. Purging a linked worktree runs `git worktree remove` against the source repo so no stale worktree metadata survives. Purge containment is absolute — only directories under `<base>/chats/` are eligible.
+
+Chat workspaces are runtime state (per-machine), not repository content — the base directory is never committed.

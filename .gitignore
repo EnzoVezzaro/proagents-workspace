@@ -8,3 +8,7 @@ docs/.acc-memory.md
 node_modules/
 dist/
 coverage/
+
+# Agent runtime state (per-machine): chat workspaces + session logs
+chats/
+.paw/

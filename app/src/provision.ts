@@ -4,9 +4,12 @@
  * from the user's choices; each command is typed into the workspace PTY so
  * the user watches every step happen, exactly like running them by hand.
  *
- *   1. materialize the project  — `git clone …` (GitHub, guarded git) or bind
- *                                 the picked folder (no copy: agents work in
- *                                 the folder itself)
+ *   1. materialize the project INTO the chat's empty workspace —
+ *      `git clone …` (GitHub), a LINKED GIT WORKTREE with its own branch
+ *      (local git repo — instant, space-efficient, T3-Code-inspired), or a
+ *      server-side copy (non-git folder). Every chat gets its OWN checkout:
+ *      two chats on the same project never share a directory (spec §36 —
+ *      sharing is explicit, never the silent default).
  *   2. install packages         — detected from the manifest files present
  *   3. ACC + proagents setup    — context scaffold + AGENTS.md contract file
  *
@@ -15,6 +18,9 @@
 import { promises as fs, readdirSync } from "node:fs";
 import path from "node:path";
 import { WorkspaceError } from "@proagents/contracts";
+
+/** Directories that never make sense to copy into a fresh chat workspace. */
+const COPY_EXCLUDES = ["node_modules", "dist", "coverage", ".git", ".paw", ".acc"];
 
 export interface SetupStep {
   readonly label: string;
@@ -76,10 +82,11 @@ function installCommand(root: string, files: readonly string[]): string | null {
 
 /**
  * Build the real setup command list for a workspace about to be provisioned.
- * `absoluteRoot` is the workspace root (== project root for GitHub projects;
- * for a local folder the workspace IS the folder — agents never work on a
- * copy). Only reading the manifest listing needs fs; every mutation happens
- * through the terminal commands returned here.
+ * `absoluteRoot` is the chat's OWN workspace root — the project is
+ * materialized INTO it (clone, or per-chat copy of the picked folder), so
+ * two chats never share a directory. Only reading the manifest listing
+ * needs fs; every mutation happens through the terminal commands returned
+ * here.
  *
  * `askpassPath` (optional) prefixes the clone with GIT_ASKPASS so private
  * repos authenticate through the environment — the command text itself
@@ -90,6 +97,16 @@ export function planSetup(request: {
   source: "local" | "github";
   /** For github: the CLEAN clone URL to run in the parent terminal first. */
   cloneUrl?: string;
+  /**
+   * For local folders: the folder to materialize INTO the workspace. Every
+   * chat gets its own checkout — the source folder is never bound in place
+   * (two chats on one folder must not mix).
+   */
+  copyFrom?: string;
+  /** Local folder is a git repo → materialize as a linked worktree + own branch. */
+  gitWorktree?: boolean;
+  /** Branch name for the per-chat worktree (defaults to a chat branch). */
+  branch?: string;
   absoluteRoot: string;
   /** Base-dir-relative root, for echo'd context in the terminal. */
   displayRoot: string;
@@ -105,10 +122,29 @@ export function planSetup(request: {
     steps.push({ label: "clone repository", command: `${envPrefix}git clone ${request.cloneUrl} .` });
   }
 
-  // Synchronous manifest scan to pick the installer (local folders only —
-  // for a fresh clone the packages install after the clone command runs).
+  if (request.source === "local" && request.copyFrom !== undefined) {
+    // Local GIT repo → a linked git worktree with its own branch (the
+    // T3-Code worktree model: per-thread checkout + branch, instant, no
+    // duplicate object store). Non-git folders → a plain per-chat copy.
+    if (request.gitWorktree === true) {
+      steps.push({
+        label: "create git worktree",
+        command: worktreeAddCommand(request.copyFrom, request.absoluteRoot, request.branch),
+      });
+    } else {
+      steps.push({
+        label: "copy project into workspace",
+        command: tarCopyCommand(request.copyFrom, request.absoluteRoot),
+      });
+    }
+  }
+
+  // Synchronous manifest scan to pick the installer. After the copy step the
+  // copied tree's manifest is detectable directly (the copy precedes this in
+  // the terminal sequence); for a fresh clone the packages install after the
+  // clone command runs.
   let files: string[] = [];
-  if (request.source === "local") {
+  if (request.source === "local" && request.copyFrom === undefined) {
     try {
       files = readdirSync(request.absoluteRoot);
     } catch {
@@ -118,7 +154,7 @@ export function planSetup(request: {
   const install = installCommand(request.absoluteRoot, files);
   if (install !== null) {
     steps.push({ label: "install packages", command: install });
-  } else if (request.source === "github") {
+  } else if (request.copyFrom !== undefined || request.source === "github") {
     // Fresh clone: the manifest is only knowable AFTER the clone, so the
     // install step detects the package manager inside the terminal itself.
     steps.push({
@@ -146,6 +182,32 @@ export function planSetup(request: {
 /** Quote a path for safe use in a POSIX shell word. */
 function shellQuote(value: string): string {
   return `"${value.replace(/(["$\\`])/g, "\\$1")}"`;
+}
+
+/**
+ * The copy command that materializes a non-git local folder INTO the chat's
+ * empty workspace. `tar` streams the tree server-free (one child process,
+ * preserves dotfiles by default) while excluding everything that must never
+ * cross a chat boundary: dependencies (node_modules), build output (dist,
+ * coverage), and the agent-state machinery (.git, .paw, .acc) — a chat
+ * inherits the project's CODE, not another workspace's state.
+ */
+function tarCopyCommand(from: string, to: string): string {
+  const excludeFlags = COPY_EXCLUDES.map((d) => `--exclude='/${d}'`).join(" ");
+  return `mkdir -p ${shellQuote(to)} && tar -C ${shellQuote(from)} ${excludeFlags} -cf - . | tar -C ${shellQuote(to)} -xf - && echo 'project copied into workspace'`;
+}
+
+/**
+ * The worktree command that materializes a local GIT repo INTO the chat's
+ * empty workspace (T3-Code worktree model, per-thread checkout): a NEW branch
+ * is created for this chat and checked out into the chat's own directory —
+ * the source repo keeps working untouched on its own branch. The branch name
+ * is sanitized like T3 does (slashes → dashes) so nested paths stay flat.
+ */
+function worktreeAddCommand(repo: string, to: string, branch?: string): string {
+  const repoName = path.basename(repo);
+  const safeBranch = (branch ?? `chat/${repoName}-${Math.random().toString(36).slice(2, 8)}`).replace(/\//g, "-");
+  return `git -C ${shellQuote(repo)} worktree add -b ${safeBranch} ${shellQuote(to)} && echo 'worktree ready (branch ${safeBranch})'`;
 }
 
 /**

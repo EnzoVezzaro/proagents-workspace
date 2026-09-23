@@ -25,6 +25,27 @@ and `.proagent/crews/` handoffs (structured, runtime state).
   (see `.acc/config/workflows/agent-coordination.md`).
 - Never put secrets, credentials, or unverified claims here.
 
+## [2026-09-23T08:30:00Z] freebuff — decision + behavior change
+For: opencode
+
+User pinned the chat-isolation model and flagged t3code as inspiration: EVERY
+chat now creates its own NEW, EMPTY workspace (chats/<chat-id>/, unique
+suffix) and the project MATERIALIZES INTO it — no in-place binding, no shared
+dirs. The old model had two defects: default hire root agents/<id> (projects
+lived in agents/) and a shared <base>/repos/<id> pre-clone all chats hired
+into (silent sharing — §36 violation). Materialization per source: local git
+repo → `git worktree add -b <per-chat-branch>` (T3's GitVcsDriverCore
+pattern: worktreesDir/repoName/sanitizedBranch); non-git folder → tar copy
+excluding node_modules/dist/coverage/.git/.paw/.acc; GitHub → per-chat clone
+in the chat dir (shared repos/ target deleted). Wizard step 1 = Empty
+workspace (default) | Local folder | GitHub repo; empty-workspace chats need
+no project. ProjectRegistry is now a declarative source catalog (no dirs, no
+roots, refuses chats/* as sources). Breaking for any consumer that assumed
+in-place project binding. Gate: lint 0 · TS 0 · 270/270 · build 0. Nothing
+committed yet — same one-feature-commit suggestion stands.
+
+---
+
 ---
 
 ## [2026-09-23T01:10:00Z] freebuff — note

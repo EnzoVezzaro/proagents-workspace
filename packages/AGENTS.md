@@ -17,6 +17,9 @@ Owner: proagents-workspace maintainers
   (review surface, ACC014): plugins build on the SDK, the CLI ships the
   catalog. Kernel-purity limits that cycle to a single leaf consumer, so
   packages/cli is the only package that ever imports a plugin.
+- The control-room UI (`app/`) is a leaf consumer like the CLI: it imports
+  the kernel and plugins directly and never the other way around; this
+  packages edge is declared here (ACC022 review surface).
 
 ## Layout
 

@@ -6,10 +6,21 @@
  *   (settings, env vars) → a launched, isolated environment the crew works
  *   in and the user can open editor-style.
  *
+ * ISOLATION MODEL (spec §36 — sharing is explicit, never silent):
+ *   EVERY chat creates its own NEW, EMPTY workspace under `chats/<chat-id>/`.
+ *   The chosen project is then MATERIALIZED INTO that workspace — a GitHub
+ *   repo is cloned there, a local folder is copied there (state dirs
+ *   excluded). Two chats never share a directory: each holds its own copy of
+ *   the project and its own agent state. An "empty workspace" chat (no
+ *   project) is the default — a blank environment the crew fills.
+ *
  * The wizard is a CONFIG assembler: every step lands in declarative state
  * (workspace entries + sandbox modes + env plumbing), and the actual launch
  * goes through the same kernel paths as manual hiring — no side door.
- */import { WorkspaceError } from "@proagents/contracts";
+ */
+import { promises as fs } from "node:fs";
+import path from "node:path";
+import { WorkspaceError } from "@proagents/contracts";
 import type { BootState } from "./context.js";
 import type { ConnectedProject } from "./projects.js";
 import type { HiredAgent } from "./agents.js";
@@ -27,7 +38,12 @@ export interface WizardCrewMember {
 }
 
 export interface WizardRequest {
-  /** Step 1 — project: an already-connected project id, OR a local path, OR a GitHub repo. */
+  /**
+   * Step 1 — project to materialize INTO this chat's fresh workspace. Omit
+   * it entirely for the default: an EMPTY workspace (a blank environment).
+   * A project id references an already-connected source; a localPath is
+   * registered as a source on the fly; a github repo is cloned per chat.
+   */
   readonly project?: { id?: string; localPath?: string; github?: { repo: string; branch?: string } };
   /** Step 2/3/5 — crew: selected profiles with their agent kinds. */
   readonly crew?: readonly WizardCrewMember[];
@@ -44,7 +60,22 @@ export interface WizardRequest {
 
 export interface WizardResult {
   readonly environmentId: string;
-  readonly project: ConnectedProject;
+  /** The NEW, EMPTY workspace this chat owns (chats/<id>, unique per chat). */
+  readonly workspace: {
+    readonly workspaceId: string;
+    /** Base-dir-relative root, e.g. `chats/<chat-id>`. */
+    readonly root: string;
+    readonly absoluteRoot: string;
+    /** True when this run created a fresh empty workspace (always, today). */
+    readonly fresh: true;
+  };
+  readonly project: ConnectedProject | null;
+  /** How the project landed in the workspace (none = empty workspace chat). */
+  readonly materialization:
+    | { readonly kind: "none" }
+    | { readonly kind: "clone"; readonly repo: string; readonly branch?: string }
+    | { readonly kind: "worktree"; readonly from: string }
+    | { readonly kind: "copy"; readonly from: string };
   readonly contextFramework: "acc";
   readonly sandbox: string;
   /** Env var NAMES only — values are never returned (secret-handling rule). */
@@ -62,9 +93,9 @@ export interface WizardResult {
   readonly terminalId: string;
   /**
    * Honest provisioning outcome. `ok: false` means the workspace did NOT
-   * reach the fully-provisioned state (ACC + proagents + deps); the agents
-   * stay 'hired' with a raw shell — fix in the terminal, then launch the
-   * harness (POST /api/agents/:id/launch).
+   * reach the fully-provisioned state (project materialized + ACC +
+   * proagents + deps); the agents stay 'hired' with a raw shell — fix in
+   * the terminal, then launch the harness (POST /api/agents/:id/launch).
    */
   readonly provisioning: {
     readonly ok: boolean;
@@ -117,15 +148,28 @@ export function listProfiles(): readonly AgentProfile[] {
   return AGENT_PROFILES;
 }
 
+/** Fresh, collision-free chat id: name (sanitized) + short random suffix. */
+function newChatId(requestedName: string | undefined, fallbackLabel: string): string {
+  const base = (requestedName !== undefined && requestedName.trim().length > 0
+    ? requestedName.trim()
+    : fallbackLabel)
+    .toLowerCase()
+    .replace(/[^a-z0-9-]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 30);
+  const suffix = Math.random().toString(36).slice(2, 8);
+  return base.length > 0 ? `${base}-${suffix}` : `chat-${suffix}`;
+}
+
 /**
- * Run the wizard: resolve/build the project, then hire each crew member into
- * the SAME project root (the shared isolated environment), applying the
- * sandbox mode to every member. Env var NAMES are validated; values are
- * passed to the child processes through the process environment only.
+ * Run the wizard: create THIS chat's own empty workspace, materialize the
+ * project into it, then hire each crew member INTO that workspace root.
+ * All members share the chat's workspace (one crew, one environment) and
+ * never touch another chat's directory.
  */
 export async function runWizard(state: BootState, request: WizardRequest): Promise<WizardResult> {
-  // Step 1 — project.
-  let project: ConnectedProject;
+  // Step 1 — resolve the project SOURCE (no directory is bound or created).
+  let project: ConnectedProject | null = null;
   if (request.project?.id !== undefined) {
     const existing = state.projects.get(request.project.id);
     if (existing === undefined) {
@@ -140,13 +184,9 @@ export async function runWizard(state: BootState, request: WizardRequest): Promi
   } else if (request.project?.localPath !== undefined) {
     project = await state.projects.connectLocal({ path: request.project.localPath });
   } else if (request.project?.github !== undefined) {
-    project = await state.projects.connectGithub({ repo: request.project.github.repo, ...(request.project.github.branch !== undefined ? { branch: request.project.github.branch } : {}) });
-  } else {
-    throw new WorkspaceError({
-      code: "CONFIG_INVALID",
-      message: "The wizard needs a project: pass project.id, project.localPath, or project.github.repo.",
-      recoverable: true,
-      suggestions: ["GET /api/projects for connected projects"],
+    project = await state.projects.connectGithub({
+      repo: request.project.github.repo,
+      ...(request.project.github.branch !== undefined ? { branch: request.project.github.branch } : {}),
     });
   }
 
@@ -182,12 +222,19 @@ export async function runWizard(state: BootState, request: WizardRequest): Promi
   }
 
   const sandbox = request.sandbox ?? "workspace-write";
-  const envLabel = request.name !== undefined && request.name.trim().length > 0
-    ? request.name.trim().toLowerCase().replace(/[^a-z0-9-]+/g, "-").slice(0, 30)
-    : project.id;
 
-  // Steps 6+launch — hire each member INTO the project root with deferred
-  // harness launch so the terminal still runs the raw shell.
+  // THE ISOLATION BOUNDARY: this chat gets a NEW, EMPTY workspace of its own
+  // (chats/<chat-id>, unique per run). The project (if any) is materialized
+  // INTO it below; nothing is ever bound in place or shared across chats.
+  const chatId = newChatId(request.name, project?.id ?? "chat");
+  const absoluteRoot = path.join(state.baseDir, "chats", chatId);
+  await fs.mkdir(absoluteRoot, { recursive: true });
+  const relativeRoot = path.relative(state.baseDir, absoluteRoot);
+
+  // Hire each member INTO the chat's workspace root with deferred harness
+  // launch so the terminal still runs the raw shell during provisioning.
+  // The PRIMARY member owns the chat id itself (agentId == workspaceId ==
+  // chat dir, the 1:1 rule); later members get suffixed ids in the same root.
   const members: WizardResult["crew"][number][] = [];
   let index = 0;
   for (const member of crew) {
@@ -195,9 +242,9 @@ export async function runWizard(state: BootState, request: WizardRequest): Promi
     const hired: HiredAgent = await state.roster.hire({
       profileId: member.profileId,
       agentKind: member.agentKind,
-      root: project.absoluteRoot,
+      root: relativeRoot,
       sandbox,
-      name: `${envLabel}-${member.role ?? member.profileId}-${index}`,
+      name: index === 1 ? chatId : `${chatId}-${member.role ?? member.profileId}-${index}`,
       deferLaunch: true,
       ...(request.lifecycleRef !== undefined ? { lifecycleRef: request.lifecycleRef } : {}),
     });
@@ -211,8 +258,8 @@ export async function runWizard(state: BootState, request: WizardRequest): Promi
   }
 
   // Materialize + provision through the PRIMARY member's REAL terminal:
-  // clone (github, visible in the terminal) → install packages → ACC +
-  // proagents setup. The terminal scrollback IS the setup log.
+  // clone (github) or copy (local folder) INTO the empty workspace → install
+  // packages → ACC + proagents setup. The terminal scrollback IS the log.
   const primary = members[0];
   if (primary === undefined) {
     throw new WorkspaceError({
@@ -231,21 +278,25 @@ export async function runWizard(state: BootState, request: WizardRequest): Promi
       suggestions: ["Open the workspace terminal first"],
     });
   }
-  // Provisioning runs as REAL, SEQUENCED commands in the primary's terminal:
-  // every step is awaited on its true exit code (clone → install → scaffold),
-  // so a slow clone can never interleave with the next step and the harness
-  // only launches into a FULLY provisioned workspace. On failure the shell is
-  // left open (the scrollback shows why) and the agents stay 'hired' — the UI
-  // exposes Launch harness + POST /api/agents/:id/launch to retry or finish.
-  const cloneUrl = project.source === "github" && project.repo !== undefined
+  const cloneUrl = project?.source === "github" && project.repo !== undefined
     ? assertCloneTarget(`https://github.com/${project.repo}.git`)
     : undefined;
+  const copyFrom = project !== null && project.source === "local" ? project.absoluteRoot : undefined;
+  // Local git repo → materialize as a LINKED WORKTREE with its own branch
+  // (T3-Code model: per-chat checkout + branch, instant, one object store);
+  // non-git folders fall back to a per-chat copy. Detection runs now, the
+  // command still executes IN the terminal (visible, no hidden exec).
+  const isGitRepo = copyFrom !== undefined
+    ? await fs.stat(path.join(copyFrom, ".git")).then((s) => s.isDirectory() || s.isFile()).catch(() => false)
+    : false;
   const askpass = await ensureGitAskpass(state.baseDir);
   const steps = planSetup({
-    source: project.source,
+    source: project?.source ?? "local",
     ...(cloneUrl !== undefined ? { cloneUrl } : {}),
-    absoluteRoot: project.absoluteRoot,
-    displayRoot: project.root,
+    ...(copyFrom !== undefined ? { copyFrom } : {}),
+    ...(copyFrom !== undefined && isGitRepo ? { gitWorktree: true } : {}),
+    absoluteRoot,
+    displayRoot: relativeRoot,
     ...(askpass !== null ? { askpassPath: askpass } : {}),
   });
   const failures: { label: string; exitCode: number }[] = [];
@@ -258,8 +309,9 @@ export async function runWizard(state: BootState, request: WizardRequest): Promi
   }
 
   // Harness launch ONLY into a fully provisioned workspace (the launch
-  // contract: end with ACC + proagents fully set up). A failed step keeps
-  // the raw shell — recovery: fix in the terminal, then Launch harness.
+  // contract: end with the project in place + ACC + proagents set up). A
+  // failed step keeps the raw shell — recovery: fix in the terminal, then
+  // Launch harness.
   let launched = false;
   if (failures.length === 0) {
     const firstTask = crew[0]?.task;
@@ -270,8 +322,22 @@ export async function runWizard(state: BootState, request: WizardRequest): Promi
   }
 
   return {
-    environmentId: `${envLabel}-${members.length}-crew`,
+    environmentId: `${chatId}-crew`,
+    workspace: {
+      workspaceId: chatId,
+      root: relativeRoot,
+      absoluteRoot,
+      fresh: true,
+    },
     project,
+    materialization:
+      project === null
+        ? { kind: "none" }
+        : project.source === "github"
+          ? { kind: "clone", repo: project.repo ?? project.id, ...(project.branch !== undefined ? { branch: project.branch } : {}) }
+          : isGitRepo
+            ? { kind: "worktree", from: project.root }
+            : { kind: "copy", from: project.root },
     contextFramework,
     sandbox,
     envVarNames: envNames,

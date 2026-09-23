@@ -10,6 +10,9 @@
  *      watches and interacts with the live agent exactly like in the
  *      DeepSeek Harness or a VS Code integrated terminal.
  *
+ * Isolation: each hire owns its own directory (chats/<id> by default); a
+ * chat never binds a project in place — the wizard materializes the project
+ * INTO the chat's workspace (clone or per-chat copy).
  * There is NO simulated agent layer: `prompt` types the message into the
  * terminal (the running harness reads it from the PTY), and the agent's
  * output IS the terminal stream. The terminal is the single source of truth;
@@ -32,7 +35,7 @@ export interface HiredAgent {
   readonly workspaceId: string;
   readonly root: string;
   readonly sandbox: string;
-  readonly status: "hired" | "working" | "stopped";
+  readonly status: "hired" | "working" | "stopped" | "settled";
   readonly hiredAt: string;
   readonly terminalId: string;
   /** What the USER asked (agent output lives in the terminal stream). */
@@ -104,11 +107,13 @@ export class AgentRoster {
    * Hire: declare + mount the isolated workspace, open a REAL terminal in
    * it, verify the harness CLI exists (fail-closed before anything runs),
    * then launch the harness inside the terminal. Optional `task` is typed
-   * as the first message once the harness is up.
+   * as the first message once the harness is up. `root` (base-dir relative)
+   * is the chat's own workspace; it defaults to a fresh `chats/<agentId>`.
    */
   async hire(request: {
     profileId: string;
     agentKind: string;
+    /** Base-dir-relative workspace root; default chats/<agentId> (own, empty). */
     root?: string;
     sandbox?: string;
     task?: string;
@@ -158,9 +163,11 @@ export class AgentRoster {
       });
     }
 
-    // 3. Root: a per-agent subdirectory of the base dir unless given — every
-    //    hired agent gets its OWN isolated directory by default.
-    const absoluteRoot = path.resolve(this.options.baseDir, request.root ?? path.join("agents", agentId));
+    // 3. Root: the agent's OWN chat workspace by default — a per-agent
+    //    subdirectory `chats/<agentId>` of the base dir (never a shared or
+    //    in-place project root; the wizard materializes projects INTO this
+    //    empty workspace). Every hired agent is isolated by default.
+    const absoluteRoot = path.resolve(this.options.baseDir, request.root ?? path.join("chats", agentId));
     await fs.mkdir(absoluteRoot, { recursive: true });
     const relativeRoot = path.relative(this.options.baseDir, absoluteRoot);
 
@@ -383,6 +390,25 @@ export class AgentRoster {
     if (this.manager.list().some((m) => m.workspaceId === agentId)) {
       await this.manager.unmount(agentId);
     }
+  }
+
+  /**
+   * Settle a chat (T3-Code model): mark finished work out of the active
+   * list WITHOUT destroying anything — the workspace, session log, and
+   * worktree stay on disk and the chat can be resumed later. Nothing is
+   * killed here: settled ≠ stopped.
+   */
+  settle(agentId: string): void {
+    const agent = this.agents.get(agentId);
+    if (agent === undefined) {
+      throw new WorkspaceError({
+        code: "WORKSPACE_NOT_FOUND",
+        message: `Agent "${agentId}" is not hired.`,
+        recoverable: true,
+        suggestions: ["GET /api/agents lists hired agents"],
+      });
+    }
+    this.agents.set(agentId, { ...agent, status: "settled" });
   }
 }
 

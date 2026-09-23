@@ -61,6 +61,8 @@
             <button id="toggle-code" class="btn small">⌘ Code</button>
             <button id="toggle-term" class="btn small">⌘J Terminal</button>
             <button id="toggle-inspect" class="btn small">⌘I Inspect</button>
+            <button id="chat-settle" class="btn small" title="Settle: mark finished work out of the active list — workspace and history stay on disk">✓ Settle</button>
+            <button id="chat-purge" class="btn small danger" title="Purge: stop the crew and delete this chat's workspace (refused while uncommitted work exists)">🗑 Purge</button>
             <button id="chat-stop" class="btn small danger">Stop</button>
           </div>
         </header>
@@ -125,11 +127,10 @@
     <h2>New chat — configure its workspace</h2>
     <p class="muted small">A chat is bound to an isolated environment: its own folder, harness and proagent crew.</p>
 
-    <h3 class="wiz-h">1 · Folder</h3>
-    <label>Connected project
-      <select id="wiz-project"></select>
-    </label>
+    <h3 class="wiz-h">1 · Workspace</h3>
+    <p class="muted small">Every chat gets a <b>new, empty workspace of its own</b> — a project (folder or repo) is copied/cloned <i>into</i> it, so chats never mix.</p>
     <div class="seg">
+      <button id="wiz-new-empty" class="btn seg-btn active">Empty workspace</button>
       <button id="wiz-new-local" class="btn seg-btn">Local folder</button>
       <button id="wiz-new-github" class="btn seg-btn">GitHub repo</button>
     </div>

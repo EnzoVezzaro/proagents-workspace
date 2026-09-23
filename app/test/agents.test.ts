@@ -94,7 +94,8 @@ describe("AgentRoster (real-terminal contract)", () => {
     expect(hired.workspaceId).toBe("a1");
     expect(hired.terminalId).toMatch(/^tty-a1-/);
     // Entry declared in the config the manager reads (reconstructability).
-    expect(config.workspaces?.a1?.root).toBe("agents/a1");
+    // Default root is the chat's OWN workspace: chats/<agentId>.
+    expect(config.workspaces?.a1?.root).toBe("chats/a1");
     expect(config.workspaces?.a1?.plugins).toEqual([{ id: "agent-claude" }, { id: "shell" }]);
     // Mounted through the kernel manager + a live REAL terminal exists.
     expect(manager.mounted.has("a1")).toBe(true);
@@ -208,14 +209,13 @@ describe("ProjectRegistry", () => {
     await expect(registry.connectGithub({ repo: "not a repo" })).rejects.toMatchObject({ code: "CONFIG_INVALID" });
   });
 
-  it("registers a GitHub repo without cloning — the clone happens at launch in the terminal", async () => {
+  it("registers a GitHub repo as a declarative source — each chat clones it into its own workspace", async () => {
     const registry = new ProjectRegistry({ baseDir: tmpBase, getRepository: async () => undefined });
     const project = await registry.connectGithub({ repo: "owner/repo" });
     expect(project.source).toBe("github");
     expect(project.repo).toBe("owner/repo");
-    // The (empty) target dir exists so the workspace can bind it; the real
-    // `git clone` runs in the workspace terminal when the wizard launches.
-    const stat = await fs.stat(project.absoluteRoot);
-    expect(stat.isDirectory()).toBe(true);
+    // No shared clone target is created anymore: the wizard clones per chat,
+    // INTO the chat's own workspace directory.
+    await expect(fs.stat(path.join(tmpBase, "repos"))).rejects.toMatchObject({ code: "ENOENT" });
   });
 });

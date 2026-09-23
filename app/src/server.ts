@@ -9,7 +9,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { HOST, PORT, boot, snapshot, feedSnapshot, sseClients } from "./context.js";
 import { json, errorBody, readBody, runWs } from "./http.js";
-import { agentKinds, desktopInfo, inspectAgent, lifecycleCatalog, handleAgentRoutes, handleBrowseRoutes, handleProjectRoutes, handleTerminalRoutes, handleWorkspaceRoutes, handleWizardRoutes, handleEditorRoutes } from "./routes.js";
+import { agentKinds, desktopInfo, inspectAgent, lifecycleCatalog, handleAgentRoutes, handleBrowseRoutes, handleChatRoutes, handleProjectRoutes, handleTerminalRoutes, handleWorkspaceRoutes, handleWizardRoutes, handleEditorRoutes } from "./routes.js";
 import { AGENT_PROFILES } from "./profiles.js";
 
 function srcDir(): string {
@@ -149,6 +149,19 @@ async function handle(req: import("node:http").IncomingMessage, res: import("nod
       req.method as string,
       agentMatch[2],
       agentMatch[1] !== undefined ? decodeURIComponent(agentMatch[1]) : undefined,
+      body,
+      res,
+    );
+    if (handled) return;
+  }
+
+  // /api/chats/:id/(settle|purge) — chat retirement (T3-style lifecycle)
+  const chatMatch = /^\/api\/chats\/([^/]+)\/(settle|purge)$/.exec(url.pathname);
+  if (chatMatch !== null) {
+    const handled = await handleChatRoutes(
+      req.method as string,
+      decodeURIComponent(chatMatch[1] as string),
+      chatMatch[2] as "settle" | "purge",
       body,
       res,
     );

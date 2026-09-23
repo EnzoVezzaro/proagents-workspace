@@ -234,7 +234,7 @@ lifecycle:
 
 workspaces:
   flight-booking:
-    root: agents/flight-booking
+    root: chats/flight-booking-a1b2c3   # each chat owns its own workspace dir
     lifecycle: { ref: web-app }   # or lifecycle.inline: { ... }
 ```
 

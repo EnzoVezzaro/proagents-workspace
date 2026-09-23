@@ -79,14 +79,15 @@ function renderChatList() {
   $("chat-list").innerHTML = groups.length
     ? groups.map(([root, members]) => {
         const head = members[0];
+        const settled = members.every((m) => m.status === "settled" || m.status === "stopped");
         const working = members.some((m) => m.status === "working");
         const stopped = members.every((m) => m.status === "stopped");
-        const dot = working ? "working" : stopped ? "stopped" : "hired";
+        const dot = working ? "working" : stopped ? "stopped" : settled ? "settled" : "hired";
         const sel = members.some((m) => m.id === state.selected) || state.selected === head.id ? "selected" : "";
-        return `<li data-chat="${head.id}" class="${sel}">
+        return `<li data-chat="${head.id}" class="${sel}${settled ? " settled" : ""}">
           <span class="status-dot ${dot}"></span>
           <div class="c-main">
-            <div class="c-name">${escapeHtml(head.id)}</div>
+            <div class="c-name">${escapeHtml(head.id)}${settled ? ' <span class="settled-badge">settled</span>' : ""}</div>
             <div class="c-sub">${escapeHtml(root)} · ${members.length} agent${members.length > 1 ? "s" : ""}</div>
           </div>
         </li>`;
@@ -305,7 +306,6 @@ async function openWizard() {
   if (state.crews.length === 0) state.crews = (await api("/api/wizard/crews")).crews ?? [];
   // Lifecycle library (spec §6/16/146): plugin contributions + config data.
   state.lifecycles = (await api("/api/lifecycles")).lifecycles ?? [];
-  $("wiz-project").innerHTML = `<option value="">— pick a folder below —</option>` + state.projects.map((p) => `<option value="${p.id}">${p.name} (${p.source})</option>`).join("");
   $("wiz-kind").innerHTML = state.kinds.map((k) => `<option value="${k.kind}" ${k.installed ? "" : "disabled"}>${k.label}${k.installed ? "" : " — not installed"}</option>`).join("");
   $("wiz-crew-template").innerHTML = state.crews.map((c, i) => `<option value="${i}">${c.label} — ${c.description}</option>`).join("");
   $("wiz-lifecycle").innerHTML = state.lifecycles.map((l) => `<option value="${l.id}">${l.name} · ${l.stages.length} stages (${l.source})</option>`).join("");
@@ -313,7 +313,7 @@ async function openWizard() {
   wizardCrew = t ? t.members.map((m) => ({ ...m, agentKind: ($("wiz-kind").value || m.agentKind) })) : [];
   renderWizMembers();
   pickedFolder = null;
-  $("wiz-project-extra").innerHTML = "";
+  setWizSource("wiz-new-empty"); // every chat starts from its own empty workspace
   $("wiz-error").classList.add("hidden");
   $("wizard-dialog").showModal();
 }
@@ -358,27 +358,44 @@ $("wiz-kind").addEventListener("change", () => {
 
 let pickedFolder = null; // base-dir-relative path chosen in the picker
 
-$("wiz-new-local").addEventListener("click", () => {
-  $("wiz-project-extra").innerHTML = `
+// Step 1 — workspace source: empty (default), local folder COPY source, or
+// GitHub repo. None of them is bound in place: the project is materialized
+// INTO the chat's fresh workspace (chats/<chat-id>), so chats never mix.
+function setWizSource(mode) {
+  for (const b of ["wiz-new-empty", "wiz-new-local", "wiz-new-github"]) $(b).classList.toggle("active", b === mode);
+  pickedFolder = null;
+  if (mode === "wiz-new-empty") {
+    $("wiz-project-extra").innerHTML = `<p class="muted small">Start from a blank environment — the crew fills it. A connected project can be materialized into it later from the chat.</p>`;
+  } else if (mode === "wiz-new-local") {
+    $("wiz-project-extra").innerHTML = `
+    <label>Connected project
+      <select id="wiz-project"><option value="">— pick a folder below —</option></select>
+    </label>
     <div class="wiz-folder mono">
       <span id="wz-folder-label" class="muted">no folder selected</span>
       <button id="wz-browse" class="btn small">📂 Browse…</button>
-    </div>`;
-  $("wz-browse").addEventListener("click", () => void openPicker((rel) => {
-    pickedFolder = rel;
-    $("wz-folder-label").textContent = rel || "/";
-    $("wz-folder-label").classList.remove("muted");
-  }));
-});
-$("wiz-new-github").addEventListener("click", () => {
-  $("wiz-project-extra").innerHTML = `<label>Repository<input id="wz-gh-repo" placeholder="owner/repo or https://github.com/…" /></label><label>Branch <span class="muted">(optional)</span><input id="wz-gh-branch" /></label>`;
-});
+    </div>
+    <p class="muted small">The folder is <b>copied</b> into this chat's workspace (node_modules/.git excluded) — the original stays untouched.</p>`;
+    $("wiz-project").innerHTML = `<option value="">— pick a folder below —</option>` + state.projects.map((p) => `<option value="${p.id}">${p.name} (${p.source})</option>`).join("");
+    $("wz-browse").addEventListener("click", () => void openPicker((rel) => {
+      pickedFolder = rel;
+      $("wz-folder-label").textContent = rel || "/";
+      $("wz-folder-label").classList.remove("muted");
+    }));
+  } else {
+    $("wiz-project-extra").innerHTML = `<label>Repository<input id="wz-gh-repo" placeholder="owner/repo or https://github.com/…" /></label><label>Branch <span class="muted">(optional)</span><input id="wz-gh-branch" /></label><p class="muted small">The repo is <b>cloned into this chat's workspace</b> — each chat gets its own clone and its own branch work.</p>`;
+  }
+}
+$("wiz-new-empty").addEventListener("click", () => setWizSource("wiz-new-empty"));
+$("wiz-new-local").addEventListener("click", () => setWizSource("wiz-new-local"));
+$("wiz-new-github").addEventListener("click", () => setWizSource("wiz-new-github"));
 
 $("wiz-launch").addEventListener("click", async () => {
   const payload = { contextFramework: "acc", sandbox: $("wiz-sandbox").value, crew: wizardCrew, lifecycleRef: ($("wiz-lifecycle")?.value || undefined) };
   const name = $("wiz-name").value.trim();
   if (name) payload.name = name;
-  const pid = $("wiz-project").value;
+  // Empty workspace is the default — project is optional now.
+  const pid = $("wiz-project")?.value;
   const gh = $("wz-gh-repo");
   const branch = $("wz-gh-branch");
   if (pickedFolder !== null) {
@@ -387,7 +404,7 @@ $("wiz-launch").addEventListener("click", async () => {
     payload.project = { github: { repo: gh.value.trim(), ...(branch && branch.value.trim() ? { branch: branch.value.trim() } : {}) } };
   } else if (pid) {
     payload.project = { id: pid };
-  } else { $("wiz-error").textContent = "Pick a folder: browse below, connect one above, or clone a GitHub repo."; $("wiz-error").classList.remove("hidden"); return; }
+  } // else: empty workspace chat — no project key at all
   $("wiz-launch").disabled = true;
   const originalLabel = $("wiz-launch").textContent;
   $("wiz-launch").textContent = "Provisioning… (clone → install → ACC setup)";
@@ -443,6 +460,36 @@ $("chat-stop").addEventListener("click", async () => {
   if (!state.selected) return;
   try { await api(`/api/agents/${encodeURIComponent(state.selected)}/stop`, { method: "POST", body: "{}" }); await refresh(); }
   catch (e) { alertBar(e); }
+});
+// Chat retirement (T3-style): settle parks finished work; purge deletes the
+// chat's workspace for good — the server refuses while uncommitted work
+// exists, and only an explicit confirm destroys it.
+$("chat-settle").addEventListener("click", async () => {
+  if (!state.selected) return;
+  try { await api(`/api/chats/${encodeURIComponent(state.selected)}/settle`, { method: "POST", body: "{}" }); await refresh(); }
+  catch (e) { alertBar(e); }
+});
+$("chat-purge").addEventListener("click", async () => {
+  if (!state.selected) return;
+  const chat = state.chats.find((c) => c.id === state.selected);
+  const label = chat ? chat.id : state.selected;
+  if (!confirm(`Purge chat "${label}"? Its workspace directory will be deleted for good. Uncommitted work blocks a purge — commit first.`)) return;
+  try {
+    const r = await api(`/api/chats/${encodeURIComponent(state.selected)}/purge`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({}) });
+    await refresh();
+    if (r.destroyedWork) alertBar({ code: "PURGED", message: `Purged ${r.purged}; uncommitted work was destroyed (forced).` });
+  } catch (e) {
+    // Dirty-worktree guard: offer the explicit forced purge (T3 semantics).
+    if (e.code === "WORKSPACE_INVALID_STATE" && /uncommitted/.test(e.message ?? "")) {
+      if (confirm(`${e.message}\n\nDestroy the uncommitted work and purge anyway?`)) {
+        try {
+          const r = await api(`/api/chats/${encodeURIComponent(state.selected)}/purge`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ force: true }) });
+          await refresh();
+          alertBar({ code: "PURGED", message: `Purged ${r.purged}; uncommitted work was destroyed.` });
+        } catch (e2) { alertBar(e2); }
+      }
+    } else alertBar(e);
+  }
 });
 $("chat-filter").addEventListener("input", renderChatList);
 $("chat-list").addEventListener("click", (ev) => {

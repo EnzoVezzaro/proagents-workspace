@@ -11,6 +11,7 @@ import type { MountedWorkspace } from "@proagents/kernel";
 import { boot, snapshot, BASE_DIR } from "./context.js";
 import { json, runWs, readBody } from "./http.js";
 import { runWizard, suggestCrews, listProfiles, type WizardRequest } from "./wizard.js";
+import { settleChat, purgeChat } from "./chats.js";
 import { listDir, readFile, writeFile } from "./editor.js";
 import { browseDir, makeDir } from "./browser.js";
 import { resolveLifecycle } from "@proagents/kernel";
@@ -487,6 +488,30 @@ export async function handleBrowseRoutes(
 // ---------------------------------------------------------------------------
 // wizard (steps 1–7: project → crew → context → sandbox → launch)
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// chat retirement (T3-style settle/purge — spec §147)
+// ---------------------------------------------------------------------------
+
+export async function handleChatRoutes(
+  method: string,
+  agentId: string | undefined,
+  action: "settle" | "purge" | undefined,
+  body: unknown,
+  res: ServerResponse,
+): Promise<boolean> {
+  const state = await boot();
+  if (method === "POST" && action === "settle" && agentId !== undefined) {
+    await runWs(res, async () => settleChat(state, agentId as string));
+    return true;
+  }
+  if (method === "POST" && action === "purge" && agentId !== undefined) {
+    const force = (body as { force?: boolean }).force === true;
+    await runWs(res, async () => purgeChat(state, agentId as string, { force }));
+    return true;
+  }
+  return false;
+}
 
 export async function handleWizardRoutes(
   method: string,

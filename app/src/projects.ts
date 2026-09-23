@@ -1,12 +1,18 @@
 /**
- * Project connection for the control room.
+ * Project source catalog for the control room.
  *
- * Two documented ways to attach a project (spec section 12 workspace model):
- *  - local folder: validated + registered as an isolated workspace root
- *  - GitHub repo : cloned through the kernel's guarded git plugin (Repo
- *    Shield guards + approval policy apply). A token, if needed, is read
- *    from PAW_GITHUB_TOKEN / GITHUB_TOKEN env and used ONLY inside the
- *    clone URL passed to git — never logged, never returned to the UI.
+ * A "project" is a SOURCE the user can pull INTO a chat's workspace — never a
+ * directory a chat binds in place. Isolation model (spec §36: sharing is
+ * explicit, never the silent default):
+ *
+ *   - GitHub repo : the wizard clones it INTO each chat's workspace (per-chat
+ *     clone, per-chat branch work). Registration is purely declarative.
+ *   - local folder: the wizard COPIES it into each chat's workspace
+ *     (node_modules/dist/.git/.paw/.acc excluded). The original is never
+ *     touched — two chats on the same folder never mix.
+ *
+ * The registry therefore records sources (id, name, repo, connectedAt) and
+ * creates NO directories and binds NO roots.
  */
 import { promises as fs } from "node:fs";
 import path from "node:path";
@@ -17,7 +23,7 @@ export interface ConnectedProject {
   readonly id: string;
   readonly name: string;
   readonly source: "local" | "github";
-  /** Root relative to the UI base dir (stable, portable in API responses). */
+  /** Project root relative to the UI base dir (local sources only). */
   readonly root: string;
   readonly absoluteRoot: string;
   readonly connectedAt: string;
@@ -44,7 +50,7 @@ export class ProjectRegistry {
     return this.projects.get(id);
   }
 
-  /** Connect a local folder: must exist, must be inside the base dir. */
+  /** Register a local folder as a copy SOURCE: must exist, must be inside the base dir. */
   async connectLocal(request: { path: string; name?: string }): Promise<ConnectedProject> {
     const absolute = path.resolve(this.options.baseDir, request.path);
     if (!absolute.startsWith(this.options.baseDir)) {
@@ -64,13 +70,25 @@ export class ProjectRegistry {
         suggestions: ["Create the folder first", "Check the path spelling"],
       });
     }
+    // A source must not live inside any chat's workspace — chats are private
+    // scratch environments; registering one as a reusable source would let a
+    // later chat copy another chat's state (mixing exactly what §36 forbids).
+    const rel = path.relative(this.options.baseDir, absolute);
+    if (rel === "chats" || rel.startsWith(`chats${path.sep}`)) {
+      throw new WorkspaceError({
+        code: "PERMISSION_DENIED",
+        message: "A chat workspace cannot be registered as a project source.",
+        recoverable: true,
+        suggestions: ["Connect the original project folder instead"],
+      });
+    }
     const id = slug(request.name ?? path.basename(absolute));
     assertFree(this.projects, id);
     const project: ConnectedProject = {
       id,
       name: request.name ?? path.basename(absolute),
       source: "local",
-      root: path.relative(this.options.baseDir, absolute) || ".",
+      root: rel || ".",
       absoluteRoot: absolute,
       connectedAt: new Date().toISOString(),
     };
@@ -79,10 +97,9 @@ export class ProjectRegistry {
   }
 
   /**
-   * Connect a GitHub repo: REGISTERED now, CLONED at launch — the clone runs
-   * as a real `git clone` in the workspace terminal (visible to the user,
-   * DSH-style), not a hidden API call. The directory is created empty so the
-   * workspace can bind it; the clone fills it at launch.
+   * Register a GitHub repo as a clone SOURCE. NO directory is created here —
+   * each chat's wizard run clones the repo INTO that chat's own workspace
+   * (a per-chat clone; no shared clone target exists anymore).
    *
    * The token (PAW_GITHUB_TOKEN / GITHUB_TOKEN) is injected into the clone
    * URL by the wizard at launch time and never logged or returned.
@@ -93,15 +110,12 @@ export class ProjectRegistry {
     const id = slug(name);
     assertFree(this.projects, id);
 
-    const targetRoot = path.join(this.options.baseDir, "repos", id);
-    await fs.mkdir(targetRoot, { recursive: true });
-
     const project: ConnectedProject = {
       id,
       name,
       source: "github",
-      root: path.relative(this.options.baseDir, targetRoot),
-      absoluteRoot: targetRoot,
+      root: path.join("repos", id), // display-only; no dir is created
+      absoluteRoot: path.join(this.options.baseDir, "repos", id), // display-only
       connectedAt: new Date().toISOString(),
       repo: `${repo.owner}/${repo.name}`,
       ...(request.branch !== undefined ? { branch: request.branch } : {}),

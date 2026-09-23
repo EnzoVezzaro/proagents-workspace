@@ -9,6 +9,14 @@ the project stays on 0.x and everything may change.
 
 ## [Unreleased]
 
+### Changed
+
+- **Chat-workspace isolation (breaking behavior fix, spec §36 honored, README §147)**: every chat now creates its own NEW, EMPTY workspace under `chats/<chat-id>/` (unique suffix per chat) and the selected project is MATERIALIZED INTO it — never bound in place, never shared between chats. Local git repos materialize as a LINKED GIT WORKTREE with a per-chat branch (T3-Code-inspired: instant, space-efficient, one object store; slashes sanitized from branch names); non-git folders are copied per chat (`tar` pipe excluding `node_modules/`, `dist/`, `coverage/`, `.git/`, `.paw/`, `.acc/` — chats inherit code, not state); GitHub repos clone per chat into the chat's own directory (the shared `<base>/repos/<id>` pre-clone target is removed). The wizard's step 1 becomes "Workspace: Empty (default) | Local folder | GitHub repo" — an empty-workspace chat needs no project at all. The project registry is now a declarative source catalog: it creates no directories, binds no roots, and refuses chat workspaces as sources. Default hire root moved from `agents/<id>` to `chats/<id>`; the primary crew member's agentId equals the chat workspace id (1:1). Isolation verified LIVE end-to-end (`scripts/live-verify-isolation.sh`, 20 checks): empty/worktree/clone chats on distinct dirs, no cross-chat leakage, source repo untouched by worktree chats, per-chat branches, worktree metadata cleanup.
+
+### Added
+
+- **Chat retirement — settle & purge (T3-Code storage-cleanup model, README §147)**: `POST /api/chats/:id/settle` parks finished work without destroying anything (status `settled`, workspace + history + worktree stay on disk, resumable); `POST /api/chats/:id/purge` deletes the chat's workspace for good — GUARDED: uncommitted tracked changes or non-ignored untracked files refuse the purge (structured error, nothing deleted), explicit `force: true` destroys and honestly reports the destroyed work; purging a linked worktree runs `git worktree remove` against the source repo (no stale metadata); purge containment is absolute (only `<base>/chats/<id>` dirs are eligible). UI: ✓ Settle / 🗑 Purge chat actions with a settled badge + dimmed list entry and a confirm-then-force flow for dirty chats. 8 new tests (guard, force reporting, worktree detach, containment) — 278 green.
+
 ### Added
 
 - Lifecycle definitions and harness adapters as plugins (completing spec §146 for the current surface):
