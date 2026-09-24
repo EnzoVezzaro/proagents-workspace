@@ -14,8 +14,12 @@ import path from "node:path";
 import {
   installWorkspace,
   inferProjectIntent,
+  inferIntentFromText,
+  initWorkspace,
   detectProject,
   configPathFor,
+  loadConfig,
+  WorkspaceError,
   type InstallPlan,
 } from "../src/index.js";
 
@@ -118,6 +122,81 @@ describe("installWorkspace — the five-phase contract (spec 152)", () => {
       expect(typeof agent.id).toBe("string");
       expect(typeof agent.name).toBe("string");
     }
+  });
+});
+
+describe("file-driven init/install — the @README.md contract (spec 152)", () => {
+  it("paw init <file> infers intent, persists the project block, and the config loads back", async () => {
+    const root = await scratch();
+    await nodeProject(root);
+    await writeFile(
+      path.join(root, "NOTES.md"),
+      "# Notes\n\nA local-first browser application with AI research and a knowledge graph.\n",
+      "utf8"
+    );
+
+    const result = await initWorkspace(root, { from: "NOTES.md" });
+    expect(result.intent).toBeDefined();
+    expect(result.intent?.productType).toBe("browser-application");
+    expect(result.intent?.domains).toEqual(
+      expect.arrayContaining(["ai", "research", "knowledge-graph", "local-first"])
+    );
+    // Provenance is complete: the source file PLUS manifest evidence.
+    expect(result.intent?.derivedFrom).toEqual(["NOTES.md", "package.json", "tsconfig.json", "pnpm-lock.yaml"]);
+
+    // The generated config carries the project block and loads cleanly —
+    // the minimal YAML parser must round-trip exactly what we generate.
+    const yaml = await readFile(configPathFor(root), "utf8");
+    expect(yaml).toContain("project:");
+    expect(yaml).toContain("productType: browser-application");
+    const { config } = await loadConfig(root);
+    expect(config.project?.productType).toBe("browser-application");
+    expect(config.project?.domains).toContain("ai");
+    expect(config.project?.derivedFrom).toContain("NOTES.md");
+  });
+
+  it("throws the structured INTENT_SOURCE_UNREADABLE error for a missing source", async () => {
+    const root = await scratch();
+    await nodeProject(root);
+    try {
+      await initWorkspace(root, { from: "nope/missing.md" });
+      expect.unreachable("init with a missing source must throw");
+    } catch (error) {
+      expect(error).toBeInstanceOf(WorkspaceError);
+      const shaped = (error as WorkspaceError).toJSON();
+      expect(shaped.code).toBe("INTENT_SOURCE_UNREADABLE");
+      expect(shaped.recoverable).toBe(true);
+      expect(shaped.suggestions.join(" ")).toContain("paw init README.md");
+    }
+    // Nothing was initialized by the failed run.
+    expect(require("node:fs").existsSync(configPathFor(root))).toBe(false);
+  });
+
+  it("installWorkspace({ from }) drives the five phases from the file and reports the source", async () => {
+    const root = await scratch();
+    await nodeProject(root);
+    await writeFile(path.join(root, "BRIEF.md"), "# Brief\n\nAn API backend service with payments and monitoring.\n", "utf8");
+
+    const plan = await installWorkspace(root, { from: "BRIEF.md" });
+    expect(plan.from).toBe("BRIEF.md");
+    expect(plan.intent.productType).toBe("api");
+    expect(plan.intent.domains).toEqual(expect.arrayContaining(["payments", "monitoring"]));
+    const understand = plan.phases.find((p) => p.phase === "understand");
+    expect(understand?.notes.join(" ")).toContain("intent source: BRIEF.md");
+    const initialize = plan.phases.find((p) => p.phase === "initialize");
+    expect(initialize?.notes.join(" ")).toContain("project intent persisted");
+  });
+
+  it("inferIntentFromText is pure — same input, same intent, no I/O", () => {
+    const a = inferIntentFromText({ text: "a browser app with embeddings and SLOs", derivedFrom: ["README.md"] });
+    const b = inferIntentFromText({ text: "a browser app with embeddings and SLOs", derivedFrom: ["README.md"] });
+    expect(a).toEqual(b);
+    expect(a.productType).toBe("browser-application");
+    expect(a.domains).toContain("embeddings");
+    expect(a.skills).toContain("sre");
+    // Known frameworks are respected, never duplicated.
+    const c = inferIntentFromText({ text: "built with react", derivedFrom: [], knownFrameworks: ["react"] });
+    expect(c.frameworks.filter((f) => f === "react")).toHaveLength(1);
   });
 });
 

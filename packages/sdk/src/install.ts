@@ -12,147 +12,47 @@
  *
  *   inspect → understand → initialize → configure → verify
  *
+ * File-driven (spec sections 148/152): pass `from: "README.md"` (any text
+ * file relative to the project root) and the workspace starts from THAT
+ * file — the inferred intent is persisted into `.paw/workspace.yaml` as the
+ * `project:` block. This is the `@README.md` semantic contract: "Setup the
+ * workspace FOR this project description."
+ *
  * Like `paw init`, it never touches application code: metadata only
  * (spec sections 44/148). It is idempotent — running twice changes nothing
  * the second time (existing instructions and config are preserved, never
  * overwritten).
  */
-import { existsSync } from "node:fs";
-import { readFile } from "node:fs/promises";
-import path from "node:path";
-import type { LifecycleFlow } from "@proagents/contracts";
-
 import {
   detectProject,
   discoverEnvironment,
+  findReadmeText,
+  inferIntentFromText,
   initWorkspace,
   isInitialized,
   type DetectedProject,
+  type ProjectIntent,
   type VerificationPlan,
 } from "./conventions.js";
 import { defaultFlow } from "@proagents/kernel";
 import type { WorkspaceError } from "@proagents/contracts";
 
-// ---------------------------------------------------------------------------
-// Phase 2 — understand: README-driven project intent (the @README.md contract)
-// ---------------------------------------------------------------------------
-
-export interface ProjectIntent {
-  /** Inferred product shape, e.g. "browser-application", "cli", "api". */
-  readonly productType: string;
-  /** Capability domains the README describes, e.g. ["ai", "research"]. */
-  readonly domains: readonly string[];
-  /** Declared (deps) + README-derived frameworks/technologies. */
-  readonly frameworks: readonly string[];
-  /** Professional focus areas the README suggests (ProAgents persona hints). */
-  readonly skills: readonly string[];
-  /** Where the inference came from — every claim is traceable. */
-  readonly derivedFrom: readonly string[];
-}
-
-const README_CANDIDATES = ["README.md", "readme.md", "Readme.md", "README"] as const;
-
-async function readReadme(projectRoot: string): Promise<{ file: string; text: string } | null> {
-  for (const name of README_CANDIDATES) {
-    const file = path.join(projectRoot, name);
-    if (existsSync(file)) {
-      try {
-        return { file: name, text: await readFile(file, "utf8") };
-      } catch {
-        return null; // unreadable user file is not our error to raise
-      }
-    }
-  }
-  return null;
-}
-
-/** Technology dictionary: term → match pattern (overridden where prose lies). */
-const TECH: readonly { term: string; pattern: RegExp }[] = [
-  { term: "react", pattern: /\breact\b/i },
-  { term: "vue", pattern: /\bvue\b/i },
-  { term: "svelte", pattern: /\bsvelte\b/i },
-  { term: "vite", pattern: /\bvite\b/i },
-  { term: "nextjs", pattern: /\bnext\.?js\b/i },
-  { term: "astro", pattern: /\bastro\b/i },
-  { term: "angular", pattern: /\bangular\b/i },
-  { term: "express", pattern: /\bexpress\b/i },
-  { term: "fastify", pattern: /\bfastify\b/i },
-  { term: "electron", pattern: /\belectron\b/i },
-  { term: "tauri", pattern: /\btauri\b/i },
-  { term: "typescript", pattern: /\btypescript\b/i },
-  { term: "python", pattern: /\bpython\b/i },
-  { term: "rust", pattern: /\brust\b/i },
-  { term: "golang", pattern: /\bgolang\b|\bgo (?:module|runtime|project|code)\b/i },
-  { term: "postgres", pattern: /\bpostgres(?:ql)?\b/i },
-  { term: "sqlite", pattern: /\bsqlite\b/i },
-  { term: "redis", pattern: /\bredis\b/i },
-  { term: "docker", pattern: /\bdocker\b/i },
-  { term: "kubernetes", pattern: /\bkubernetes\b|\bk8s\b/i },
-  { term: "graphql", pattern: /\bgraphql\b/i },
-];
-
-const DOMAIN_PATTERNS: readonly { domain: string; pattern: RegExp }[] = [
-  { domain: "ai", pattern: /\b(ai|llm|gpt|openai|anthropic|language model)\b/i },
-  { domain: "multi-agent", pattern: /\b(multi-?agent|agent pipeline|agent swarm)\b/i },
-  { domain: "research", pattern: /\bresearch\b/i },
-  { domain: "knowledge-graph", pattern: /\b(knowledge[ -]graph|ontolog)/i },
-  { domain: "rag", pattern: /\b(rag|retrieval[ -]augmented)\b/i },
-  { domain: "embeddings", pattern: /\bembedding/i },
-  { domain: "search", pattern: /\bsearch\b/i },
-  { domain: "pdf", pattern: /\bpdf\b/i },
-  { domain: "monitoring", pattern: /\b(monitoring|observab|telemetry)\b/i },
-  { domain: "local-first", pattern: /\blocal-?first\b/i },
-  { domain: "realtime", pattern: /\b(real-?time|websocket)\b/i },
-  { domain: "auth", pattern: /\b(oauth|sso|authentication)\b/i },
-  { domain: "payments", pattern: /\b(payment|billing|checkout)\b/i },
-  { domain: "e-commerce", pattern: /\b(e-?commerce|storefront)\b/i },
-  { domain: "data-pipeline", pattern: /\b(etl|pipeline|ingestion|ingest)\b/i },
-  { domain: "browser", pattern: /\bbrowser\b/i },
-];
-
-const SKILL_PATTERNS: readonly { skill: string; pattern: RegExp }[] = [
-  { skill: "security-engineer", pattern: /\b(security|threat[ -]model|owasp)\b/i },
-  { skill: "qa-engineer", pattern: /\b(test automation|testing|quality assurance)\b/i },
-  { skill: "technical-writer", pattern: /\b(documentation|docs)\b/i },
-  { skill: "devops-engineer", pattern: /\b(devops|ci[/-]cd|infrastructure as code)\b/i },
-  { skill: "sre", pattern: /\b(reliability|slo|incident response)\b/i },
-];
-
 /**
- * Infer the project's intent from its README (the `@README.md` semantic
- * contract) and its existing manifests. Inference is ADDITIVE evidence —
- * detection from package.json still wins; the README fills what manifests
- * cannot say (product shape, domains, professional focus).
+ * Infer the project's intent from its README (the default `@README.md`
+ * contract) plus its existing manifests. Convenience wrapper over the pure
+ * `inferIntentFromText`; file-driven callers go through `installWorkspace` /
+ * `initWorkspace` with an explicit `from` source instead.
  */
 export async function inferProjectIntent(
   projectRoot: string,
   project: DetectedProject
 ): Promise<ProjectIntent> {
-  const readme = await readReadme(projectRoot);
-  const text = readme?.text ?? "";
-  const derivedFrom: string[] = [...project.evidence];
-  if (readme !== null) derivedFrom.push(readme.file);
-
-  // Frameworks: detected deps first, then README evidence (deduplicated).
-  const frameworks = new Set<string>(project.frameworks);
-  for (const { term, pattern } of TECH) {
-    if (pattern.test(text)) frameworks.add(term);
-  }
-
-  // Product shape: strongest signal wins (README-derived frameworks make the
-  // desktop branch live even without a manifest dependency; prose like
-  // "browser application" implies the product type without naming a stack).
-  let productType = "application";
-  if (frameworks.has("electron") || frameworks.has("tauri")) productType = "desktop-application";
-  else if (frameworks.has("react") || frameworks.has("vue") || frameworks.has("svelte") || frameworks.has("vite") || frameworks.has("nextjs") || frameworks.has("astro") || /\bbrowser[ -]?(?:based[ -]?)?(?:application|app)\b/i.test(text))
-    productType = "browser-application";
-  else if (/\b(command[ -]line|cli tool|terminal ui)\b/i.test(text)) productType = "cli";
-  else if (/\b(api|rest api|http server|backend service)\b/i.test(text)) productType = "api";
-
-  const domains = DOMAIN_PATTERNS.filter((d) => d.pattern.test(text)).map((d) => d.domain);
-  const skills = SKILL_PATTERNS.filter((s) => s.pattern.test(text)).map((s) => s.skill);
-
-  return { productType, domains, frameworks: [...frameworks], skills, derivedFrom };
+  const readme = await findReadmeText(projectRoot);
+  return inferIntentFromText({
+    text: readme?.text ?? "",
+    derivedFrom: [...project.evidence, ...(readme !== null ? [readme.file] : [])],
+    knownFrameworks: project.frameworks,
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -176,12 +76,14 @@ export interface InstallPlan {
     readonly monorepo: boolean;
   };
   readonly intent: ProjectIntent;
+  /** The file the intent was driven from, when installed file-driven. */
+  readonly from?: string;
   /** Detected coding agents — what `paw agent list` will report. */
   readonly agents: readonly { readonly id: string; readonly name: string; readonly command?: string }[];
   /** Runtime configuration layout written to the target. */
   readonly layout: { readonly configDir: ".paw"; readonly config: ".paw/workspace.yaml"; readonly agentsFile: "AGENTS.md" };
   /** The lifecycle flow the workspace will run (default, spec section 151). */
-  readonly lifecycleFlow: LifecycleFlow;
+  readonly lifecycleFlow: import("@proagents/contracts").LifecycleFlow;
   /** Verification checks that were configured or detected. */
   readonly verification: VerificationPlan;
   /** Files the install created (empty on a re-run). */
@@ -198,18 +100,26 @@ export interface InstallPlan {
  * want one-step install+verify chain their own verification runner (the CLI
  * does exactly that behind `paw install --verify`).
  */
-export async function installWorkspace(projectRoot: string): Promise<InstallPlan> {
+export async function installWorkspace(
+  projectRoot: string,
+  options: { readonly from?: string } = {}
+): Promise<InstallPlan> {
   // ---- inspect -------------------------------------------------------------
   const project = await detectProject(projectRoot);
   const env = await discoverEnvironment(projectRoot);
   const agents = env.filter((i) => i.kind === "agent-framework" && i.detected);
 
-  // ---- understand ----------------------------------------------------------
-  const intent = await inferProjectIntent(projectRoot, project);
-
-  // ---- initialize (metadata only, never source; idempotent) ----------------
+  // ---- initialize (+ understand, when file-driven) --------------------------
+  // initWorkspace owns the `from` contract: it reads the source, infers the
+  // intent, and persists the `project:` block — throwing the structured
+  // INTENT_SOURCE_UNREADABLE error when the file cannot be read. Its returned
+  // intent is authoritative for a file-driven install.
   const alreadyInitialized = isInitialized(projectRoot);
-  const init = await initWorkspace(projectRoot);
+  const init = await initWorkspace(projectRoot, options.from !== undefined ? { from: options.from } : {});
+  const intent =
+    options.from !== undefined && init.intent !== undefined
+      ? init.intent
+      : await inferProjectIntent(projectRoot, project); // README fallback
 
   // ---- configure (what the init generated + the lifecycle it will run) ----
   const flow = defaultFlow();
@@ -229,10 +139,11 @@ export async function installWorkspace(projectRoot: string): Promise<InstallPlan
       phase: "understand",
       status: "completed",
       notes: [
+        ...(options.from !== undefined ? [`intent source: ${options.from} (file-driven install)`] : []),
         `product type: ${intent.productType}`,
         intent.domains.length > 0 ? `domains: ${intent.domains.join(", ")}` : "domains: none recognized",
         intent.frameworks.length > 0 ? `technologies: ${intent.frameworks.join(", ")}` : "technologies: none recognized",
-        `derived from: ${intent.derivedFrom.join(", ") || "no manifests or README"}`,
+        `derived from: ${intent.derivedFrom.join(", ") || "no manifests, README, or source file"}`,
       ],
     },
     {
@@ -242,6 +153,7 @@ export async function installWorkspace(projectRoot: string): Promise<InstallPlan
         ? ["workspace already initialized — existing configuration preserved (idempotent)"]
         : [
             "created .paw/ metadata (workspace.yaml, sessions/, artifacts/)",
+            ...(options.from !== undefined ? ["project intent persisted to .paw/workspace.yaml"] : []),
             "no source file, package.json, or git state was touched (spec 44)",
           ],
     },
@@ -277,6 +189,7 @@ export async function installWorkspace(projectRoot: string): Promise<InstallPlan
       monorepo: project.monorepo,
     },
     intent,
+    ...(options.from !== undefined ? { from: options.from } : {}),
     agents: agents.map((a) => ({ id: a.id, name: a.name, ...(a.command !== undefined ? { command: a.command } : {}) })),
     layout: { configDir: ".paw", config: ".paw/workspace.yaml", agentsFile: "AGENTS.md" },
     lifecycleFlow: flow,

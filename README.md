@@ -5263,6 +5263,30 @@ inspect → understand → initialize → configure → verify
 | configure | Writes `AGENTS.md` agent notes when absent; reports the verification plan and the canonical lifecycle (section 151) |
 | verify | Reports the verification plan; executes checks only when the host asks (`paw install --verify`) |
 
+## Starting from a file — the `@README.md` contract made literal
+
+The prompt "Setup … for @README.md" implies that the workspace starts FROM the project's own description. Both entrypoints accept a source file (any text file; default behavior is unchanged when omitted):
+
+```bash
+paw init README.md       # init, inferring intent from README.md
+paw install BRIEF.md     # five-phase install, driven by BRIEF.md
+```
+
+The inferred intent (product type, domains, skills, provenance) is persisted into the generated `.paw/workspace.yaml` as the `project:` block — informational data, never a gate, named sources, edit freely:
+
+```yaml
+project:
+  productType: browser-application
+  domains:
+    - local-first
+    - ai
+  derivedFrom:
+    - README.md
+    - package.json
+```
+
+Rules: manifest evidence always appears in `derivedFrom` alongside the source file; a source file that cannot be read is a structured `INTENT_SOURCE_UNREADABLE` error (the config must never silently lie about what it understood); an already-initialized workspace keeps its existing config (the file-driven path is part of the same idempotency contract).
+
 ## What an install never does
 
 - Modifies application code, rewrites `package.json`, or changes git state.

@@ -7,6 +7,12 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 The repository is specification-first: until the first implementation release,
 the project stays on 0.x and everything may change.
 
+## [Unreleased]
+
+### Added
+
+- **File-driven init/install — the `@README.md` contract made literal (spec sections 148/152)** — both entrypoints now accept a source file: `paw init README.md` / `paw install BRIEF.md` start the workspace from the project's own words. The inferred intent (product type, domains, skills, provenance) is persisted into the generated `.paw/workspace.yaml` as the informational `project:` block (named sources, edit freely; manifest evidence always included in `derivedFrom`). New: `projectIntentSchema` + `project` in the workspace config schema, structured error `INTENT_SOURCE_UNREADABLE` (an unreadable source never silently degrades), pure `inferIntentFromText` shared by init/install (plural-aware dictionaries), `findReadmeText`, SDK `InitResult.intent` / `InstallPlan.from`; the generated `AGENTS.md` gains product-type/domains lines. Backward compatible: without a file, behavior is unchanged; existing configs are untouched.
+
 ## [0.4.0] - 2026-09-24
 
 The agent-bootstrap release: the Workspace is now installable BY an AI agent, not merely FOR one — and every workspace runs a canonical lifecycle. One line pasted into any coding agent (`Setup https://github.com/EnzoVezzaro/proagents-workspace for @README.md`) bootstraps a target repository through the five-phase install contract; `paw lifecycle` exposes the kernel-owned phase spine that stage plugins extend declaratively. Ecosystem roles unchanged: ProAgents (WHO, github.com/EnzoVezzaro/proagents) and ACC (WHAT) are separate projects — the Workspace (WHERE) bootstraps without either.

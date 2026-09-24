@@ -254,12 +254,18 @@ function renderStatus(projectRoot: string, parsed: ParsedArgs): Promise<number> 
  * agent relays back to the human ("report the resulting configuration").
  */
 async function runInstall(projectRoot: string, parsed: ParsedArgs): Promise<number> {
-  const plan = await installWorkspace(projectRoot);
+  // File-driven install (spec 152): `paw install README.md` bootstraps the
+  // workspace from that file — the @README.md semantic contract.
+  const from = typeof parsed.args[0] === "string" && parsed.args[0].length > 0 ? parsed.args[0] : undefined;
+  const plan = await installWorkspace(projectRoot, from !== undefined ? { from } : {});
   if (parsed.json) {
     process.stdout.write(`${JSON.stringify({ command: "install", ...plan }, null, 2)}\n`);
     return 0;
   }
   process.stdout.write(`Installing ProAgents Workspace into ${plan.target.projectRoot}\n\n`);
+  if (plan.from !== undefined) {
+    process.stdout.write(`Intent source: ${plan.from} → ${plan.intent.productType}\n\n`);
+  }
   for (const phase of plan.phases) {
     const mark = phase.status === "completed" ? "✓" : "○";
     process.stdout.write(`${mark} ${phase.phase}\n`);
@@ -357,8 +363,8 @@ function usage(): string {
     "Usage: paw <command> [args] [--json] [--headless]",
     "",
     "Commands:",
-    "  init          Make the current repository Workspace-aware (.paw/)",
-    "  install       Agent bootstrap: inspect → understand → initialize → configure → verify (spec 152)",
+    "  init [file]   Workspace-aware repo; with a file (e.g. README.md) intent is inferred from it",
+    "  install [f]   Agent bootstrap from file (default @README.md): inspect → understand → initialize → configure → verify",
     "  status        Where am I, what is here, what is possible",
     "  research      Discover product/environment facts (ACC-aware), ask what's missing",
     "  doctor        Health of the workspace and its providers",
@@ -437,10 +443,18 @@ async function main(): Promise<number> {
   try {
     switch (parsed.command) {
       case "init": {
-        const result = await initWorkspace(projectRoot);
+        // File-driven init (spec 152): `paw init README.md` starts the
+        // workspace from the project's own words.
+        const from = typeof parsed.args[0] === "string" && parsed.args[0].length > 0 ? parsed.args[0] : undefined;
+        const result = await initWorkspace(projectRoot, from !== undefined ? { from } : {});
         if (parsed.json) {
           process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
           return 0;
+        }
+        if (from !== undefined && result.intent !== undefined) {
+          process.stdout.write(`Intent from ${from}: ${result.intent.productType}\n`);
+          if (result.intent.domains.length > 0) process.stdout.write(`  domains: ${result.intent.domains.join(", ")}\n`);
+          if (result.intent.skills.length > 0) process.stdout.write(`  skills: ${result.intent.skills.join(", ")}\n`);
         }
         renderProject(result.project);
         for (const agent of result.agents) printCheck(agent.name, true, `tier: ${agent.tier}`);

@@ -39,11 +39,12 @@ Plans load from `.paw/checkpoints.json` (convention) or `checkpoints.plan` in `.
 
 ```bash
 paw install            # five-phase bootstrap: inspect → understand → initialize → configure → verify
+paw install BRIEF.md   # file-driven: infer the intent from BRIEF.md (default source: @README.md)
 paw install --json     # machine-readable install plan (what external agents parse)
 paw install --verify   # also execute the verification checks after the install
 ```
 
-The agent bootstrap entrypoint: metadata-only, preserving, idempotent, accountless. It detects the project (languages, runtime, package manager, frameworks, agents), infers intent from `@README.md` + manifests (every inference names its source), creates `.paw/` metadata when absent, writes `AGENTS.md` agent notes only when none exist, and reports the verification plan without running it. Existing instructions and configuration are never overwritten. See [Agent Bootstrap](bootstrap.md).
+The agent bootstrap entrypoint: metadata-only, preserving, idempotent, accountless. It detects the project (languages, runtime, package manager, frameworks, agents), infers intent from `@README.md` + manifests (every inference names its source), creates `.paw/` metadata when absent, writes `AGENTS.md` agent notes only when none exist, and reports the verification plan without running it. With a source file, the inferred intent is persisted as the `project:` block in the generated config. Existing instructions and configuration are never overwritten. See [Agent Bootstrap](bootstrap.md).
 
 ## Lifecycle Commands (spec section 151)
 

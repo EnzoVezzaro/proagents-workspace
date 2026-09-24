@@ -37,6 +37,7 @@ Key commands every document must agree on:
 
 ```bash
 paw install                                # agent bootstrap: the five-phase install (spec section 152)
+paw init README.md                         # file-driven init: infer intent from a source file (also: paw install <file>)
 paw init                                   # convention-first: initialize current repository
 paw status | research | doctor | verify | diff   # convention-first surface (current repo)
 paw agent list                             # detected agents + integration tiers

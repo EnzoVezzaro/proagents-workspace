@@ -453,6 +453,23 @@ export const networkModeSchema = z.enum([
  */
 export const WORKSPACE_CONFIG_VERSION = 1;
 
+/**
+ * The project block in the workspace config (spec sections 148/152): the
+ * intent a file-driven init/install inferred from the project's own words
+ * (e.g. `paw init README.md`). Written as data, never a gate — every claim
+ * names its source so it can be audited and edited by hand.
+ */
+export const projectIntentSchema = z
+  .object({
+    productType: z.string().min(1),
+    domains: z.array(z.string().min(1)).default([]),
+    skills: z.array(z.string().min(1)).default([]),
+    derivedFrom: z.array(z.string().min(1)).default([]),
+  })
+  .strict();
+
+export type ProjectIntentConfig = z.infer<typeof projectIntentSchema>;
+
 export const workspaceConfigSchema = z.object({
   /** Config schema version; `1` is the only supported value today. */
   version: z.number().int().optional(),
@@ -564,6 +581,12 @@ export const workspaceConfigSchema = z.object({
   lifecycle: lifecycleConfigSchema.optional(),
   /** Canonical lifecycle flow override (spec section 151). */
   lifecycleFlow: lifecycleFlowSchema.optional(),
+  /**
+   * The project intent a file-driven init/install inferred from the
+   * project's own words (`paw init README.md`, spec sections 148/152).
+   * Informational: the workspace runs identically without it.
+   */
+  project: projectIntentSchema.optional(),
   /** Checkpoint plan binding (spec section 150): inline plan or a file path. */
   checkpoints: z
     .object({

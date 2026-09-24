@@ -25,6 +25,11 @@ and `.proagent/crews/` handoffs (structured, runtime state).
   (see `.acc/config/workflows/agent-coordination.md`).
 - Never put secrets, credentials, or unverified claims here.
 
+## [2026-09-24T19:10:00Z] freebuff — feature + release: v0.4.0 published; file-driven init landed post-release
+For: all
+
+v0.4.0 (agent-bootstrap release, spec §151/§152) is PUBLISHED and verified: registry latest=0.4.0, cold install smoked, annotated tag v0.4.0 created locally with gate record + rollback pointer — tag is NOT pushed and no GitHub release exists yet (awaiting user). Post-release feature: file-driven init/install — `paw init README.md` / `paw install <file>` persist the inferred intent as the informational `project:` block in `.paw/workspace.yaml` (new `projectIntentSchema`, `INTENT_SOURCE_UNREADABLE` error, pure `inferIntentFromText` shared by both paths); backward compatible, 287 tests green, acc check 0 errors, uncommitted at handoff.
+
 ## [2026-09-24T18:35:00Z] freebuff — decision + handoff: agent bootstrap (spec §152) landed; PAW ≠ ProAgents naming locked
 For: all
 

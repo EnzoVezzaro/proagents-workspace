@@ -217,6 +217,140 @@ export async function inferVerification(projectRoot: string): Promise<Verificati
 }
 
 // ---------------------------------------------------------------------------
+// Project intent inference (spec sections 148/152) — the file-driven init
+// ---------------------------------------------------------------------------
+
+/**
+ * The project intent, as inferred from the project's own words. Every claim
+ * names the file it came from (provenance is part of the contract).
+ */
+export interface ProjectIntent {
+  /** Inferred product shape, e.g. "browser-application", "cli", "api". */
+  readonly productType: string;
+  /** Capability domains the source describes, e.g. ["ai", "research"]. */
+  readonly domains: readonly string[];
+  /** Declared (deps) + source-derived frameworks/technologies. */
+  readonly frameworks: readonly string[];
+  /** Professional focus areas the source suggests (ProAgents persona hints). */
+  readonly skills: readonly string[];
+  /** Where the inference came from — every claim is traceable. */
+  readonly derivedFrom: readonly string[];
+}
+
+export interface InferIntentOptions {
+  /** The text to infer from (already read by the caller). */
+  readonly text: string;
+  /** Source names to record in `derivedFrom` (the evidence trail). */
+  readonly derivedFrom: readonly string[];
+  /** Frameworks already detected from manifests (deps win over prose). */
+  readonly knownFrameworks?: readonly string[];
+}
+
+/** Technology dictionary: term → match pattern. */
+const TECH: readonly { term: string; pattern: RegExp }[] = [
+  { term: "react", pattern: /\breact\b/i },
+  { term: "vue", pattern: /\bvue\b/i },
+  { term: "svelte", pattern: /\bsvelte\b/i },
+  { term: "vite", pattern: /\bvite\b/i },
+  { term: "nextjs", pattern: /\bnext\.?js\b/i },
+  { term: "astro", pattern: /\bastro\b/i },
+  { term: "angular", pattern: /\bangular\b/i },
+  { term: "express", pattern: /\bexpress\b/i },
+  { term: "fastify", pattern: /\bfastify\b/i },
+  { term: "electron", pattern: /\belectron\b/i },
+  { term: "tauri", pattern: /\btauri\b/i },
+  { term: "typescript", pattern: /\btypescript\b/i },
+  { term: "python", pattern: /\bpython\b/i },
+  { term: "rust", pattern: /\brust\b/i },
+  { term: "golang", pattern: /\bgolang\b|\bgo (?:module|runtime|project|code)\b/i },
+  { term: "postgres", pattern: /\bpostgres(?:ql)?\b/i },
+  { term: "sqlite", pattern: /\bsqlite\b/i },
+  { term: "redis", pattern: /\bredis\b/i },
+  { term: "docker", pattern: /\bdocker\b/i },
+  { term: "kubernetes", pattern: /\bkubernetes\b|\bk8s\b/i },
+  { term: "graphql", pattern: /\bgraphql\b/i },
+];
+
+const DOMAIN_PATTERNS: readonly { domain: string; pattern: RegExp }[] = [
+  { domain: "ai", pattern: /\b(ai|llm|gpt|openai|anthropic|language model)\b/i },
+  { domain: "multi-agent", pattern: /\b(multi-?agent|agent pipeline|agent swarm)\b/i },
+  { domain: "research", pattern: /\bresearch\b/i },
+  { domain: "knowledge-graph", pattern: /\b(knowledge[ -]graph|ontolog)/i },
+  { domain: "rag", pattern: /\b(rag|retrieval[ -]augmented)\b/i },
+  { domain: "embeddings", pattern: /\bembedding/i },
+  { domain: "search", pattern: /\bsearch\b/i },
+  { domain: "pdf", pattern: /\bpdf\b/i },
+  { domain: "monitoring", pattern: /\b(monitoring|observab|telemetry)\b/i },
+  { domain: "local-first", pattern: /\blocal-?first\b/i },
+  { domain: "realtime", pattern: /\b(real-?time|websocket)\b/i },
+  { domain: "auth", pattern: /\b(oauth|sso|authentication)\b/i },
+  { domain: "payments", pattern: /\bpayments?\b|\bbilling\b|\bcheckout\b/i },
+  { domain: "e-commerce", pattern: /\b(e-?commerce|storefront)\b/i },
+  { domain: "data-pipeline", pattern: /\b(etl|pipeline|ingestion|ingest)\b/i },
+  { domain: "browser", pattern: /\bbrowser\b/i },
+];
+
+const SKILL_PATTERNS: readonly { skill: string; pattern: RegExp }[] = [
+  { skill: "security-engineer", pattern: /\b(security|threat[ -]model|owasp)\b/i },
+  { skill: "qa-engineer", pattern: /\b(test automation|testing|quality assurance)\b/i },
+  { skill: "technical-writer", pattern: /\b(documentation|docs)\b/i },
+  { skill: "devops-engineer", pattern: /\b(devops|ci[/-]cd|infrastructure as code)\b/i },
+  { skill: "sre", pattern: /\b(reliability|slos?|error budget|incident response)\b/i },
+];
+
+/**
+ * Infer project intent from text (PURE — no I/O; callers read the source
+ * and own the error paths). Inference is ADDITIVE evidence: manifest-derived
+ * frameworks win, the text fills what manifests cannot say (product shape,
+ * domains, professional focus).
+ */
+export function inferIntentFromText(options: InferIntentOptions): ProjectIntent {
+  const { text, derivedFrom } = options;
+  const frameworks = new Set<string>(options.knownFrameworks ?? []);
+  for (const { term, pattern } of TECH) {
+    if (pattern.test(text)) frameworks.add(term);
+  }
+
+  // Product shape: strongest signal wins. README-derived frameworks make the
+  // desktop branch live even without a manifest dependency; prose like
+  // "browser application" implies the shape without naming a stack.
+  let productType = "application";
+  if (frameworks.has("electron") || frameworks.has("tauri")) productType = "desktop-application";
+  else if (frameworks.has("react") || frameworks.has("vue") || frameworks.has("svelte") || frameworks.has("vite") || frameworks.has("nextjs") || frameworks.has("astro") || /\bbrowser[ -]?(?:based[ -]?)?(?:application|app)\b/i.test(text))
+    productType = "browser-application";
+  else if (/\b(command[ -]line|cli tool|terminal ui)\b/i.test(text)) productType = "cli";
+  else if (/\b(api|rest api|http server|backend service)\b/i.test(text)) productType = "api";
+
+  return {
+    productType,
+    domains: DOMAIN_PATTERNS.filter((d) => d.pattern.test(text)).map((d) => d.domain),
+    frameworks: [...frameworks],
+    skills: SKILL_PATTERNS.filter((s) => s.pattern.test(text)).map((s) => s.skill),
+    derivedFrom,
+  };
+}
+
+const README_CANDIDATES = ["README.md", "readme.md", "Readme.md", "README"] as const;
+
+/**
+ * Read the project's README, whatever case convention it uses. Unreadable
+ * user files are not our error to raise: a read failure yields null.
+ */
+export async function findReadmeText(projectRoot: string): Promise<{ file: string; text: string } | null> {
+  for (const name of README_CANDIDATES) {
+    const file = path.join(projectRoot, name);
+    if (existsSync(file)) {
+      try {
+        return { file: name, text: await readFile(file, "utf8") };
+      } catch {
+        return null;
+      }
+    }
+  }
+  return null;
+}
+
+// ---------------------------------------------------------------------------
 // Environment discovery (spec sections 11/12): capability-based detection
 // ---------------------------------------------------------------------------
 
@@ -391,6 +525,11 @@ export async function loadConfig(projectRoot: string): Promise<LoadedConfig> {
  * `paw init` (spec sections 3/17): make the repository Workspace-aware.
  * Creates ONLY workspace metadata — never touches source files, never
  * rewrites package.json, never changes git state (spec section 44).
+ *
+ * File-driven (spec sections 148/152): pass `from: "README.md"` (any text
+ * file relative to the project root) and the inferred project intent is
+ * persisted into the generated `.paw/workspace.yaml` as the `project:`
+ * block — the workspace starts from the project's own description.
  */
 export interface InitResult {
   readonly projectRoot: string;
@@ -398,15 +537,50 @@ export interface InitResult {
   readonly project: DetectedProject;
   readonly verification: VerificationPlan;
   readonly agents: readonly DiscoveredIntegration[];
+  /** Present only for a file-driven init (`from`). */
+  readonly intent?: ProjectIntent;
 }
 
-export async function initWorkspace(projectRoot: string): Promise<InitResult> {
+export async function initWorkspace(
+  projectRoot: string,
+  options: { readonly from?: string } = {}
+): Promise<InitResult> {
   const project = await detectProject(projectRoot);
   const verification = await inferVerification(projectRoot);
   const env = await discoverEnvironment(projectRoot);
   const agents = detectedAgents(env);
   const pawDir = pawDirFor(projectRoot);
   const created: string[] = [];
+
+  // File-driven intent: read the source the caller pointed at, infer, and
+  // carry the result into the config. An UNREADABLE file is a structured
+  // error — silently omitting it would make the config lie about what it
+  // understood. Manifest evidence is included so provenance is complete.
+  let intent: ProjectIntent | undefined;
+  if (options.from !== undefined) {
+    const resolved = path.resolve(projectRoot, options.from);
+    let text: string | null = null;
+    try {
+      text = await readFile(resolved, "utf8");
+    } catch {
+      text = null;
+    }
+    if (text === null) {
+      throw new WorkspaceError({
+        code: "INTENT_SOURCE_UNREADABLE",
+        message: `Cannot read the intent source file: ${options.from}`,
+        recoverable: true,
+        suggestions: ["Pass a path to an existing text file, e.g. `paw init README.md`"],
+        details: { file: resolved },
+      });
+    }
+    const relative = path.relative(projectRoot, resolved) || path.basename(resolved);
+    intent = inferIntentFromText({
+      text,
+      derivedFrom: [relative, ...project.evidence],
+      knownFrameworks: project.frameworks,
+    });
+  }
 
   await mkdir(pawDir, { recursive: true });
   for (const dir of [SESSIONS_DIR, "artifacts"]) {
@@ -432,6 +606,25 @@ export async function initWorkspace(projectRoot: string): Promise<InitResult> {
       for (const check of verification.checks) lines.push(`    - ${check.command}`);
       lines.push("");
     }
+    if (intent !== undefined) {
+      lines.push(
+        "# Project intent (spec section 152) — inferred from the project's own",
+        "# words by a file-driven init; informational only, edit freely.",
+        "project:",
+        `  productType: ${intent.productType}`
+      );
+      if (intent.domains.length > 0) {
+        lines.push("  domains:");
+        for (const domain of intent.domains) lines.push(`    - ${domain}`);
+      }
+      if (intent.skills.length > 0) {
+        lines.push("  skills:");
+        for (const skill of intent.skills) lines.push(`    - ${skill}`);
+      }
+      lines.push("  derivedFrom:");
+      for (const source of intent.derivedFrom) lines.push(`    - ${source}`);
+      lines.push("");
+    }
     await writeFile(configPath, lines.join("\n"), "utf8");
     created.push(path.join(PAW_DIR, CONFIG_FILE));
   }
@@ -451,6 +644,8 @@ export async function initWorkspace(projectRoot: string): Promise<InitResult> {
       `- Languages: ${project.languages.join(", ") || "unknown"}`,
       project.packageManager !== undefined ? `- Package manager: ${project.packageManager}` : undefined,
       project.frameworks.length > 0 ? `- Frameworks: ${project.frameworks.join(", ")}` : undefined,
+      intent !== undefined ? `- Product type: ${intent.productType}` : undefined,
+      intent !== undefined && intent.domains.length > 0 ? `- Domains: ${intent.domains.join(", ")}` : undefined,
       verification.checks.length > 0 ? `- Verification: ${verification.checks.map((c) => c.command).join(" → ")}` : undefined,
       "",
       "## Working here",
@@ -466,7 +661,14 @@ export async function initWorkspace(projectRoot: string): Promise<InitResult> {
     created.push("AGENTS.md");
   }
 
-  return { projectRoot, created, project, verification, agents };
+  return {
+    projectRoot,
+    created,
+    project,
+    verification,
+    agents,
+    ...(intent !== undefined ? { intent } : {}),
+  };
 }
 
 // ---------------------------------------------------------------------------

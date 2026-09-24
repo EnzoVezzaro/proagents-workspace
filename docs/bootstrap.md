@@ -29,6 +29,19 @@ inspect  →  understand  →  initialize  →  configure  →  verify
 | configure | Writes `AGENTS.md` agent notes when absent; reports the verification plan and lifecycle |
 | verify | Reports the verification plan; executes only with `paw install --verify` |
 
+## Starting from a file
+
+The `@README.md` in the prompt is a semantic contract — the workspace starts from the project's own description. Make it explicit by passing the source file (any text file):
+
+```bash
+paw init README.md       # init with intent inferred from README.md
+paw install BRIEF.md     # install driven by BRIEF.md
+```
+
+The inferred intent is persisted as a `project:` block in the generated
+`.paw/workspace.yaml` — informational, named sources, edit freely. An
+unreadable source file is a structured `INTENT_SOURCE_UNREADABLE` error.
+
 ## Guarantees
 
 - **Metadata-only** — application code, `package.json`, and git state are never touched (spec section 44).

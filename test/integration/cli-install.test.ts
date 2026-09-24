@@ -94,6 +94,58 @@ describe("paw install (CLI e2e, spec section 152)", () => {
     expect(readFileSync(path.join(project, "AGENTS.md"), "utf8")).toBe(agentsMd);
   }, 60_000);
 
+  it("init with a source file starts the workspace from the project's own words (spec 152)", async () => {
+    const fileDriven = path.join(scratch, "file-driven");
+    mkdirSync(fileDriven, { recursive: true });
+    writeFileSync(
+      path.join(fileDriven, "package.json"),
+      JSON.stringify({ name: "file-driven", scripts: { test: "echo ok" } }),
+      "utf8"
+    );
+    writeFileSync(
+      path.join(fileDriven, "BRIEF.md"),
+      "# Brief\n\nA local-first browser application with AI research and a knowledge graph.\n",
+      "utf8"
+    );
+
+    const result = await paw(["init", "BRIEF.md"], fileDriven);
+    expect(result.stdout).toContain("Intent from BRIEF.md: browser-application");
+    expect(result.stdout).toContain("local-first");
+
+    // The persisted project block round-trips through the config loader.
+    const show = await paw(["config", "show", "--json"], fileDriven);
+    const config = JSON.parse(show.stdout) as { config: { project?: { productType: string; derivedFrom: string[] } } };
+    expect(config.config.project?.productType).toBe("browser-application");
+    expect(config.config.project?.derivedFrom).toContain("BRIEF.md");
+
+    // A missing source file is a structured error, not a crash.
+    await expect(paw(["init", "nope.md"], fileDriven)).rejects.toMatchObject({
+      stderr: expect.stringContaining("INTENT_SOURCE_UNREADABLE"),
+    });
+  }, 60_000);
+
+  it("install with a source file reports the intent source in the five phases", async () => {
+    const fileInstall = path.join(scratch, "file-install");
+    mkdirSync(fileInstall, { recursive: true });
+    writeFileSync(
+      path.join(fileInstall, "package.json"),
+      JSON.stringify({ name: "file-install" }),
+      "utf8"
+    );
+    writeFileSync(path.join(fileInstall, "BRIEF.md"), "# Brief\n\nAn API backend service with payments.\n", "utf8");
+
+    const result = await paw(["install", "BRIEF.md", "--json"], fileInstall);
+    const parsed = JSON.parse(result.stdout) as {
+      from?: string;
+      intent: { productType: string };
+      phases: { phase: string; notes: readonly string[] }[];
+    };
+    expect(parsed.from).toBe("BRIEF.md");
+    expect(parsed.intent.productType).toBe("api");
+    const understand = parsed.phases.find((p) => p.phase === "understand");
+    expect(understand?.notes.join(" ")).toContain("intent source: BRIEF.md");
+  }, 60_000);
+
   it("AGENTS.md carries the agent-facing bootstrap vocabulary", async () => {
     const agentsMd = readFileSync(path.join(project, "AGENTS.md"), "utf8");
     expect(agentsMd).toContain("# Agent Notes");

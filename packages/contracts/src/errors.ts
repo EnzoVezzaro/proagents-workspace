@@ -9,6 +9,8 @@ export const ErrorCode = {
   WORKSPACE_NOT_FOUND: "WORKSPACE_NOT_FOUND",
   // convention-first local mode (spec section 148)
   PROJECT_NOT_INITIALIZED: "PROJECT_NOT_INITIALIZED",
+  // file-driven init/install (spec sections 148/152)
+  INTENT_SOURCE_UNREADABLE: "INTENT_SOURCE_UNREADABLE",
   // checkpoints + gates (spec section 150): attempt ≠ completion
   CHECKPOINT_NOT_FOUND: "CHECKPOINT_NOT_FOUND",
   CHECKPOINT_BLOCKED: "CHECKPOINT_BLOCKED",
