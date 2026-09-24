@@ -44,6 +44,16 @@ import {
 
 const shellService = defineService<ShellProvider>({ id: "shell", contractVersion: "1.0.0" });
 
+/**
+ * CLI version. In the repo build this falls back to the package version; the
+ * npm publish pipeline compiles the bundle with `--define`, so the published
+ * binary reports the exact released version (stability contract: the version
+ * string is what users and scripts compare).
+ */
+declare const __PAW_CLI_VERSION__: string | undefined;
+const CLI_VERSION = typeof __PAW_CLI_VERSION__ !== "undefined" ? __PAW_CLI_VERSION__ : "0.2.0";
+const WORKSPACE_API_VERSION = "1.0.0";
+
 interface ParsedArgs {
   command: string | undefined;
   args: string[];
@@ -343,6 +353,20 @@ function usage(): string {
 async function main(): Promise<number> {
   const parsed = parseArgs(process.argv.slice(2));
   const projectRoot = process.cwd();
+
+  // `paw --version` (documented in docs/getting-started.md): never boots the
+  // kernel — reads the CLI package version injected at build time, so a
+  // bundled/published binary reports the version it was built from.
+  if (parsed.flags["version"] === true || parsed.command === "version") {
+    const payload = {
+      version: CLI_VERSION,
+      workspaceApi: WORKSPACE_API_VERSION,
+      node: process.version,
+    };
+    if (parsed.json) process.stdout.write(`${JSON.stringify(payload, null, 2)}\n`);
+    else process.stdout.write(`paw ${payload.version} (workspace API ${payload.workspaceApi}, node ${payload.node})\n`);
+    return 0;
+  }
 
   if (parsed.command === undefined || parsed.command === "help" || parsed.flags["help"] === true) {
     if (parsed.json) {

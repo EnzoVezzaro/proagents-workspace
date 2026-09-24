@@ -7,7 +7,8 @@ This standard fixes the exact product vocabulary. Every document, example, error
 | Concept | Name | Never |
 |---------|------|-------|
 | CLI binary | `paw` | `proagent-workspace`, `proagents`, `pw` |
-| npm package (global install) | `proagents-workspace` | `@proagents/proagent-workspace` |
+| npm package (global install) | `@reposell/proagents-workspace` (published) | any other name |
+| repo CLI package (source of the binary) | `proagents-workspace` (workspace pkg, not published) | — |
 | SDK package | `@proagents/workspace` | any other scope |
 | CLI config file | `workspace.yaml` | `paw.yaml`, `proagents.yaml` |
 | Success criterion command | `paw workspace create --repo ... --runtime ... --context acc --agent codex` | — |
@@ -15,10 +16,10 @@ This standard fixes the exact product vocabulary. Every document, example, error
 ## Install
 
 ```bash
-npm install -g proagents-workspace
+npm install -g @reposell/proagents-workspace
 ```
 
-Requires Node.js 18+.
+Requires Node.js 18+. The published package is a SELF-CONTAINED bundle (packages/cli/esbuild.mjs → one file, zero runtime deps, spec section 61); republish via `pnpm --filter proagents-workspace bundle && pnpm --filter proagents-workspace pack:npm`, then `npm publish --access public` in `packages/cli/npm-stage/` (publish is irreversible — smoke the tarball with `npm install -g ./` in a scratch prefix first).
 
 ## Command Structure (spec sections 50–55, 148)
 

@@ -7,6 +7,12 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 The repository is specification-first: until the first implementation release,
 the project stays on 0.x and everything may change.
 
+## [Unreleased]
+
+### Added
+
+- **npm publish pipeline + first published package** (`@reposell/proagents-workspace@0.2.0`): the `paw` CLI is now installable worldwide via `npm install -g @reposell/proagents-workspace`. Mechanism: esbuild compiles the CLI + SDK + kernel + contracts + bundled plugins + zod into ONE self-contained ESM file (only `node:*` builtins external, shebang prepended at byte offset 0, version injected via `--define` so `paw --version` reports the released version) — zero runtime dependency resolution, honoring the lightweight-install requirement (spec section 61) without renaming the 18 `@proagents/*` workspace packages. New: `packages/cli/esbuild.mjs` (`bundle` script), `packages/cli/pack-npm.mjs` + `npm-README.md` (`pack:npm` script, stages `npm-stage/` — gitignored), npm-facing README, LICENSE file (MIT, matching every package.json), and `paw --version` / `paw version` (`--json` supported; documented but previously unimplemented). Publish documented as a blocking section of the release checklist (tarball rehearsal + cold registry install required); all install commands across README/docs/standards updated to the scoped name; repo package stays `proagents-workspace` per the CLI vocabulary standard.
+
 ## [0.2.0] - 2026-09-24
 
 The convention-first release: the product's default experience becomes a

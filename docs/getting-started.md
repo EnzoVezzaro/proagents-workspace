@@ -4,7 +4,7 @@
 
 ```bash
 # Install ProAgents Workspace (provides the `paw` CLI)
-npm install -g proagents-workspace
+npm install -g @reposell/proagents-workspace
 
 paw --version
 ```

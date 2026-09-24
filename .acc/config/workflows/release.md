@@ -11,7 +11,7 @@ Stable-contract checklist before publishing a ProAgents Workspace documentation 
 ## CLI vocabulary (blocking)
 
 - [ ] Every command example uses the `paw` binary — no `proagent-workspace` binary references.
-- [ ] Install instructions say `npm install -g proagents-workspace`.
+- [ ] Install instructions say `npm install -g @reposell/proagents-workspace`.
 - [ ] SDK imports use `@proagents/workspace`.
 - [ ] Every documented command exists in the spec's CLI sections (50–63) and in `docs/cli-reference.md`.
 
@@ -39,6 +39,15 @@ Stable-contract checklist before publishing a ProAgents Workspace documentation 
 - [ ] `acc check` passes with 0 errors on the repository.
 - [ ] `acc graph docs` shows the expected docs boundary with no new diagnostics.
 - [ ] All `AGENTS.md` contracts match the current repository state (no ACC010/ACC072 diagnostics).
+
+## npm publish (when releasing the CLI)
+
+- [ ] `pnpm --filter proagents-workspace bundle` produces the self-contained bundle (dist/paw.bundle.mjs, zero runtime deps).
+- [ ] `pnpm --filter proagents-workspace pack:npm` stages `@reposell/proagents-workspace` (bundle + LICENSE + npm README + scoped manifest).
+- [ ] Tarball rehearsed: `npm pack` in the stage dir, `npm install -g ./<tarball>` into a scratch prefix, `paw --version` + golden-path smoke in a scratch repo.
+- [ ] `npm publish --access public` in `packages/cli/npm-stage/` (irreversible — never republish a version, even unpublishing within the grace period is discouraged).
+- [ ] Registry verified after propagation: `npm view @reposell/proagents-workspace version` then a cold `npm install -g @reposell/proagents-workspace` smoke.
+- [ ] New versions also get a CHANGELOG entry and a matching git tag before or with the publish.
 
 ## Memory & contracts
 

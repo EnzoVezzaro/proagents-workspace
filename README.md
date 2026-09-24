@@ -9,7 +9,7 @@ ProAgents Workspace is a lightweight, convention-first workspace environment tha
 It is NOT another agent, another IDE, or a mandatory cloud sandbox. It is the environment + conventions around an AI coding agent.
 
 ```bash
-npm install -g proagents-workspace
+npm install -g @reposell/proagents-workspace
 
 cd my-project
 paw init        # makes the repository Workspace-aware (.paw/ only — source untouched)
@@ -4046,7 +4046,7 @@ The first five minutes must be excellent.
 A new developer should be able to:
 
 ```bash
-npm install -g proagents-workspace
+npm install -g @reposell/proagents-workspace
 ```
 
 then:
@@ -4963,7 +4963,7 @@ The default product experience is a **lightweight developer tool**, not a platfo
 ## The golden path
 
 ```bash
-npm install -g proagents-workspace
+npm install -g @reposell/proagents-workspace
 cd any-git-project
 paw init
 paw status

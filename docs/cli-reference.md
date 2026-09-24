@@ -3,7 +3,7 @@
 The CLI is the primary interface to ProAgents Workspace — a normal developer CLI, not a platform console.
 
 - **Binary:** `paw`
-- **Package:** `proagents-workspace` (installed via `npm install -g proagents-workspace`)
+- **Package:** `@reposell/proagents-workspace` (installed via `npm install -g @reposell/proagents-workspace`)
 
 The CLI uses the same underlying Workspace API as the SDK — the CLI never duplicates SDK implementation.
 

@@ -25,7 +25,7 @@ Provider implementations declare compatible API versions. Nothing else gets a ve
 - Do not break existing Workspace configurations unnecessarily (spec section 121).
 - The first-five-minutes flow must never break (spec section 122):
   ```bash
-  npm install -g proagents-workspace
+  npm install -g @reposell/proagents-workspace
   paw workspace create --repo github:myorg/myrepo --runtime docker
   ```
 - The zero-cloud path must keep working across releases (spec section 123).

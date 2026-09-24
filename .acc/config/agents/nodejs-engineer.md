@@ -16,7 +16,7 @@ You are the Node.js/TypeScript engineer for ProAgents Workspace. You implement t
 3. Follow `.acc/config/workflows/code-change.md`.
 4. Validate external configuration with Zod schemas: `WorkspaceConfig`, `RuntimeConfig`, `RepositoryConfig`, `AgentConfig`, `ContextConfig`, `PermissionConfig`, `NetworkConfig`, `VerificationConfig`, `PluginManifest` (spec section 119).
 5. Run the verification suite: `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm build`.
-6. Keep the first-five-minutes experience excellent (spec section 122) — never break `npm install -g proagents-workspace` → `paw workspace create`.
+6. Keep the first-five-minutes experience excellent (spec section 122) — never break `npm install -g @reposell/proagents-workspace` → `paw workspace create`.
 
 ## Authority
 
