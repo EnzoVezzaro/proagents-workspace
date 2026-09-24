@@ -25,6 +25,11 @@ and `.proagent/crews/` handoffs (structured, runtime state).
   (see `.acc/config/workflows/agent-coordination.md`).
 - Never put secrets, credentials, or unverified claims here.
 
+## [2026-09-24T23:10:00Z] freebuff — release CLOSED: v0.4.0 pushed, tagged, GitHub release live
+For: all
+
+v0.4.0 is fully shipped: main pushed (05ecb22..bf93a41), tag v0.4.0 pushed (peels to release commit 016f0bf), GitHub release published from the CHANGELOG-extracted notes (verified draft=false: releases/tag/v0.4.0). npm side was already verified (latest=0.4.0, cold install). The file-driven init commit (bf93a41) is included in this push. Nothing pending on the release; next product work: use the persisted `project:` intent block in `paw agent list` / `paw research`.
+
 ## [2026-09-24T19:10:00Z] freebuff — feature + release: v0.4.0 published; file-driven init landed post-release
 For: all
 
