@@ -168,10 +168,12 @@ paw shell                    # Interactive shell session
 paw terminal attach           # Persistent terminal
 paw service start <name>
 paw service stop <name>
+paw service list             # Registered capability services [--json]
 paw secret list
 paw snapshot create
 paw snapshot restore <id>
 paw logs
+paw config show              # Effective configuration + where each layer came from [--json]
 paw config get
 paw config set
 ```
