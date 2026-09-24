@@ -2,18 +2,28 @@
 
 🚧 **Work in Progress**
 
-## The programmable workspace for AI agents
+## The convention-first workspace for AI coding agents
 
-ProAgents Workspace is an open-source, agent-first execution environment where AI agents can work on real software.
+ProAgents Workspace is a lightweight, convention-first workspace environment that makes existing AI coding agents work better inside a predictable, inspectable, convention-driven development environment.
 
-It provides agents with a controlled computer environment containing the resources required to inspect, modify, execute, test, and verify software.
+It is NOT another agent, another IDE, or a mandatory cloud sandbox. It is the environment + conventions around an AI coding agent.
+
+```bash
+npm install -g proagents-workspace
+
+cd my-project
+paw init        # makes the repository Workspace-aware (.paw/ only — source untouched)
+paw status      # where am I, what is here, what is possible
+paw verify      # runs detected lint/typecheck/test/build — no configuration needed
+codex           # your existing agent keeps working
+```
+
+No runtime required. No cloud account required. No desktop application required. No Docker, E2B, GitHub, ACC, ProAgents, or MCP required.
 
 It is designed to work with:
 
-* ProAgents
-* ACC
-* Claude Code
 * Codex
+* Claude Code
 * OpenCode
 * Gemini CLI
 * DeepSeek Harness
@@ -23,6 +33,23 @@ It is designed to work with:
 The Workspace itself does not define the agent's profession or intelligence.
 
 It provides the environment in which the agent operates.
+
+### Product direction: LIGHTWEIGHT FIRST, PROGRESSIVE SECOND
+
+The product follows a progressive layering (spec section 148):
+
+```text
+Level 0  Zero configuration    paw            detect and explain
+Level 1  Initialize            paw init       minimal .paw/ conventions
+Level 2  Agent integration     paw agent list detected agents + tiers
+Level 3  Verification          paw verify     inferred from project scripts
+Level 4  Context               ACC etc.       optional context providers
+Level 5  Lifecycle             paw lifecycle  programmable, inferred by default
+Level 6  Isolation             paw workspace create --runtime docker|e2b
+Level 7  Desktop               paw desktop    optional projection UI
+```
+
+Everything below Level 3 is OPTIONAL and invisible until it provides value. The default experience operates directly on the developer's current repository — the project is never cloned or moved. Isolated runtimes are a separate, explicit mode (spec section 148: "Workspace" = the developer/project environment by default; "isolated/runtime workspace" = the heavier sandboxed mode).
 
 ---
 
@@ -2245,17 +2272,23 @@ If dependency resolution fails, report it clearly.
 
 # 50. CLI
 
-The CLI should be the primary interface.
+The CLI is the primary interface: a normal developer CLI, not a platform console. The developer-facing surface leads with the convention-first commands; infrastructure commands exist when needed but are never forced into every command.
 
 Command structure:
 
 ```text
 paw
+├── init              (convention-first: make this repository Workspace-aware)
+├── status            (convention-first: where am I / what is here)
+├── research          (convention-first: product/environment discovery, section 149)
+├── doctor            (convention-first: diagnostics; optional ≠ failure)
+├── verify            (convention-first: run detected/configured checks)
+├── diff              (convention-first: git working-tree diff)
+├── agent
 ├── workspace
 ├── runtime
 ├── repository
 ├── context
-├── agent
 ├── plugin
 ├── git
 ├── pr
@@ -2265,10 +2298,11 @@ paw
 ├── service
 ├── secret
 ├── snapshot
-├── verify
 ├── logs
 └── config
 ```
+
+Ergonomic rule: `paw verify`, `paw diff`, `paw status` operate on the current repository — NOT `paw workspace verify`/`paw workspace diff`. The `workspace` noun is reserved for isolated workspaces (section 148).
 
 ---
 
@@ -2313,6 +2347,8 @@ paw agent status
 paw agent attach
 ```
 
+`paw agent list` reports DETECTED agents with their honest integration tier (detect/environment/process/native — section 148); detection is capability-based over declared integration probes, never a hard-coded agent table in the kernel.
+
 Example:
 
 ```bash
@@ -2345,6 +2381,8 @@ paw verify build
 paw verify lint
 paw verify typecheck
 ```
+
+Verification is NATIVE and inferred by default (spec section 18): with no configured commands, `paw verify` discovers project checks from existing conventions (package scripts, manifests) in the order lint → typecheck → test → build, and runs them. Configured commands in `.paw/workspace.yaml` always win over inference. Results are machine-readable with `--json`.
 
 ---
 
@@ -4913,3 +4951,162 @@ Connected projects are SOURCE records (id, name, repo, origin), not directories.
 - **Purge** deletes the chat's workspace directory for good. It is GUARDED: uncommitted tracked changes or non-ignored untracked files refuse the purge (the error states that nothing was deleted); an explicit force destroys the work and reports what was destroyed. Purging a linked worktree runs `git worktree remove` against the source repo so no stale worktree metadata survives. Purge containment is absolute — only directories under `<base>/chats/` are eligible.
 
 Chat workspaces are runtime state (per-machine), not repository content — the base directory is never committed.
+
+---
+
+# 148. Convention-First Local Mode (Product Model)
+
+The default product experience is a **lightweight developer tool**, not a platform adoption. The product rule is normative:
+
+> **Everything that can be inferred locally should be inferred locally before asking the developer to configure it. Everything that can remain optional should remain optional until the user needs it.**
+
+## The golden path
+
+```bash
+npm install -g proagents-workspace
+cd any-git-project
+paw init
+paw status
+paw verify
+codex        # or claude, opencode, gemini, dsh — the developer's agent is never replaced
+```
+
+This must work without Docker, E2B, GitHub, ACC, ProAgents, MCP, a desktop application, a cloud account, or an API key. A local Git repository is already a valid Workspace.
+
+## Terminology (normative)
+
+- **Workspace** (default) — the developer's project environment. `paw` operates on the CURRENT repository; the project is never cloned, moved, or rewritten.
+- **Isolated workspace / runtime workspace** — the heavier sandboxed mode created explicitly with `paw workspace create --runtime docker|e2b|…`. Used for automation, CI, untrusted or parallel agents.
+
+The two concepts must not be conflated in product language. The desktop application is an optional projection over the Workspace API — never required, never the source of truth.
+
+## Progressive levels
+
+```text
+Level 0  Zero configuration    paw            detect and explain, write nothing
+Level 1  Initialize            paw init       minimal .paw/ metadata only
+Level 2  Agent integration     paw agent list detection + honest integration tiers
+Level 3  Verification          paw verify     inferred from project scripts
+Level 4  Context               ACC etc.       optional context providers (plugins)
+Level 5  Lifecycle             programmable; default inferred, never forced
+Level 6  Isolation             paw workspace create --runtime …  (opt-in)
+Level 7  Desktop               paw desktop    optional projection UI
+```
+
+## Conventions (what `paw init` creates)
+
+Workspace metadata is separated from application source code:
+
+```text
+.paw/
+├── workspace.yaml      # minimal; `version: 1` is valid configuration
+├── research/           # paw research artifacts (section 149)
+├── proagents/          # handoff artifacts for the ProAgents layer (section 149)
+├── sessions/           # append-only session logs (section 143)
+└── artifacts/
+```
+
+`paw init` NEVER overwrites project files, NEVER rewrites package.json, NEVER installs dependencies silently, NEVER changes Git history or remotes. Existing `AGENTS.md`/`.acc/` files are respected — they are owned by their existing owners (ACC), not duplicated into `.paw/`.
+
+## Configuration UX and precedence
+
+A minimal configuration is just:
+
+```yaml
+version: 1
+```
+
+Everything else is inferred. Precedence (highest applied last):
+
+```text
+built-in defaults → global user config (~/.paw/config.yaml) → project config (.paw/workspace.yaml)
+→ workspace profile → environment (PAW_* variables) → CLI flags
+```
+
+The default tool set for a zero-config local workspace is `filesystem` + `shell`; the guarded repository capability activates when configuration or an isolated workspace asks for it. Simple commands (`status`, `doctor`, `agent list`) do NOT boot plugins or runtimes — capability activation is lazy (spec sections 37–38). Performance targets: `paw --help` < 100 ms, `paw status` < 200 ms, `paw doctor` < 500 ms, `paw verify` = project-dependent.
+
+## Environment discovery (capability-based)
+
+Agent/context integration is discovery, not a hard-coded conditional. The detector resolves DECLARED integration probes (binary on PATH, well-known config files) and classifies them:
+
+```text
+agent-frameworks   codex, claude, opencode, gemini, dsh, aider, …
+context-frameworks ACC, AGENTS.md, CLAUDE.md, .cursorrules, …
+tool-protocols     MCP
+runtimes           git, node, python, cargo, go, docker
+providers          (model/API providers, when present)
+```
+
+Integration tiers are reported honestly and never inflated:
+
+```text
+Tier 0  detect       the integration was found
+Tier 1  environment  conventions/env available to the agent
+Tier 2  process      the workspace can launch it
+Tier 3  native       native hooks/plugin APIs (only when real)
+```
+
+## Advanced path (unchanged)
+
+The same core architecture still supports the isolated, automated workflow:
+
+```bash
+paw workspace create --repo github:org/project --runtime e2b --context acc --agent codex
+paw lifecycle run
+```
+
+---
+
+# 149. Workspace Research — Product/Environment Discovery
+
+`paw research` is the integration point between the product-level Workspace and the ACC / ProAgents ecosystems. It answers:
+
+> **"What kind of coding environment does this product need?"**
+
+ACC answers "what does this repository/environment know" (knowledge substrate). ProAgents answers "how should an agent operate professionally" (professional-agent substrate). The harness answers "where does the agent execute". Workspace orchestrates the convergence — it is not a competing context manager, interview engine, or agent framework.
+
+## Ownership boundaries (normative)
+
+- **Workspace owns PRODUCT questions**: what are we building, who is it for, what is the workflow, what does "done" mean. These determine the coding environment.
+- **ACC owns context**: `AGENTS.md`, `.acc/`, architecture graphs, memory. Research CONSULTS context providers through the existing `ContextProvider` contract; it never duplicates or rewrites their files.
+- **ProAgents owns agent questions**: role, skills, methods, rules, permissions, crews. Workspace hands product/environment requirements to ProAgents via a machine-readable artifact; it never generates skills or profiles itself.
+
+## The research flow
+
+```text
+paw init
+   ↓
+paw research
+   ├─ Context providers (ACC / git / filesystem — plugins, resolved generically)
+   ├─ Repository facts (manifests, scripts, lockfiles)
+   ├─ Environment facts (detected agents, runtimes)
+   ↓
+Research model (.paw/research/research.json — machine-readable)
+   ↓
+Uncertainty detection → highest-value product questions
+   ↓
+User answers (interactive, or `paw research answer <id> <answer>` — resumable)
+   ↓
+Coding environment assembly (verification, conventions, lifecycle defaults)
+```
+
+When no context provider is available, research degrades honestly:
+
+```text
+No context provider available. Workspace will continue using standard repository context.
+```
+
+## Artifacts
+
+```text
+.paw/research/research.json     # the research model (facts + questions + provenance)
+.paw/research/product.md        # human-readable projection
+.paw/research/decisions.md      # append-only record of resolved decisions
+.paw/proagents/requirements.json # agent-level requirements handed to ProAgents
+```
+
+Every fact records provenance (`context-provider`, `repository`, `environment`, `user`). A fact already present — from ANY source — never becomes a question. Questions are derived from uncertainty only; the interview is progressive (answers may close or refine later questions) but never a giant questionnaire.
+
+## Boundary with the kernel
+
+Research is a PRODUCT capability in the SDK/CLI layer, not a kernel or provider concern (kernel purity, section 139): the SDK consumes the existing `ContextProvider` contract through supplied providers and never imports concrete plugins (dependency direction, section 50). Context providers participate during research exactly as they do at runtime — as plugins.

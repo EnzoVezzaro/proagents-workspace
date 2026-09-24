@@ -2,9 +2,16 @@
 /**
  * `paw` — the ProAgents Workspace CLI.
  *
- * The CLI is thin: it parses flags, boots a WorkspaceClient with the bundled
- * plugins, and renders command results. All behavior lives in the kernel and
- * plugins — CLI and SDK call the same services (spec section 64).
+ * Convention-first product model (spec section 148): the CLI is a lightweight
+ * developer tool around an existing repository. The golden path is
+ *
+ *   paw init → paw status → paw verify → <your agent>
+ *
+ * with zero cloud dependencies, zero mandatory configuration, and lazy
+ * capability activation — simple commands never boot plugins, runtimes, or
+ * remote services (spec sections 37–38). Commands that DO need capabilities
+ * boot a WorkspaceClient with the bundled plugin catalog (catalog semantics:
+ * only config-referenced plugins activate).
  *
  * Interface rules (cli-vocabulary standard, spec sections 97–99):
  *   - every important command supports --json (deterministic output)
@@ -12,8 +19,28 @@
  *   - errors are structured: code, message, provider, recoverable, suggestions
  */
 import { WorkspaceClient, WorkspaceError, type WorkspaceClientOptions } from "@proagents/workspace";
-import { defineService, type ShellProvider } from "@proagents/contracts";
+import { defineService, type ContextProvider, type ShellProvider } from "@proagents/contracts";
+import { accContextPlugin } from "@proagents/plugin-context-acc";
 import { bundledPlugins } from "./plugins.js";
+import {
+  detectProject,
+  discoverEnvironment,
+  detectedAgents,
+  inferVerification,
+  initWorkspace,
+  isInitialized,
+  loadConfig,
+  pawDirFor,
+  workspaceStatus,
+  runResearch,
+  answerQuestion,
+  deriveQuestions,
+  hasResearch,
+  researchModelPath,
+  researchContextService,
+  type DiscoveredIntegration,
+  type ResearchModel,
+} from "./conventions.js";
 
 const shellService = defineService<ShellProvider>({ id: "shell", contractVersion: "1.0.0" });
 
@@ -51,27 +78,65 @@ function parseArgs(argv: readonly string[]): ParsedArgs {
   };
 }
 
-function loadConfig(): unknown {
-  // V1: environment-driven configuration; workspace.yaml file loading lands
-  // with the runtime milestones. Shape matches docs/configuration.md.
-  return {
-    runtime: { provider: process.env.PAW_RUNTIME ?? "local" },
-    repository: process.env.PAW_REPOSITORY
-      ? { provider: "git", repository: process.env.PAW_REPOSITORY }
-      : undefined,
-    approval: { mode: process.env.PAW_APPROVAL ?? "guarded" },
-    tools: ["filesystem", "shell", "git"],
-    plugins: (process.env.PAW_PLUGINS ?? "").split(",").filter(Boolean).map((id) => ({ id })),
-  };
+/**
+ * Load the effective configuration with the documented precedence (spec
+ * section 35): built-in defaults → global user config → project config
+ * (`.paw/workspace.yaml`) → environment → CLI flags. Project detection
+ * contributes verification commands when the project file did not list any
+ * (spec sections 17–18: infer locally before asking the developer).
+ */
+async function effectiveConfig(projectRoot: string, parsed: ParsedArgs): Promise<{ config: unknown; sources: readonly string[] }> {
+  const loaded = await loadConfig(projectRoot);
+  const config = { ...loaded.config } as Record<string, unknown>;
+  const sources = loaded.sources.map((s) => s.layer);
+
+  // Layer: environment (env still wins over project config for runtime and
+  // plugin selection).
+  if (process.env.PAW_RUNTIME !== undefined) {
+    config["runtime"] = { provider: process.env.PAW_RUNTIME };
+    sources.push("environment (PAW_RUNTIME)");
+  }
+  const envPlugins = (process.env.PAW_PLUGINS ?? "").split(",").map((id) => id.trim()).filter(Boolean);
+  if (envPlugins.length > 0) {
+    config["plugins"] = envPlugins.map((id) => (id === "filesystem" ? { id, options: { root: projectRoot } } : { id }));
+    config["tools"] = envPlugins;
+    config["permissions"] = {
+      ...(config["permissions"] as Record<string, unknown> | undefined),
+      filesystem: { read: [projectRoot], write: [projectRoot] },
+    };
+    sources.push("environment (PAW_PLUGINS)");
+  }
+  // Layer: CLI flags.
+  const runtimeFlag = parsed.flags["runtime"];
+  if (typeof runtimeFlag === "string") {
+    config["runtime"] = { provider: runtimeFlag };
+    sources.push("--runtime flag");
+  }
+  const repoFlag = parsed.flags["repo"];
+  if (typeof repoFlag === "string") {
+    config["repository"] = { provider: "git", repository: repoFlag };
+    sources.push("--repo flag");
+  }
+
+  // Inferred verification: only when configuration did not specify commands.
+  const configuredCommands = (config["verification"] as { commands?: string[] } | undefined)?.commands ?? [];
+  if (configuredCommands.length === 0 && isInitialized(projectRoot)) {
+    const plan = await inferVerification(projectRoot);
+    if (plan.checks.length > 0) {
+      config["verification"] = { commands: plan.checks.map((c) => c.command) };
+      sources.push("detected project scripts");
+    }
+  }
+  return { config, sources };
 }
 
-function clientOptions(parsed: ParsedArgs): WorkspaceClientOptions {
+function clientOptions(parsed: ParsedArgs, config: unknown): WorkspaceClientOptions {
   return {
-    config: loadConfig(),
+    config,
     plugins: bundledPlugins(),
     // The bundled set is a catalog: only config-referenced plugins activate,
-    // so `paw doctor` on a plain config reports an empty set instead of
-    // booting both runtimes into a service conflict.
+    // so a plain config reports an empty set instead of booting both runtimes
+    // into a service conflict.
     catalog: true,
     // --headless fails closed on approvals (spec section 97).
     approvalFlow: parsed.headless
@@ -110,78 +175,403 @@ function clientOptions(parsed: ParsedArgs): WorkspaceClientOptions {
   };
 }
 
+// ---------------------------------------------------------------------------
+// Renderers (human output; --json paths print the same data as JSON)
+// ---------------------------------------------------------------------------
+
+function printCheck(label: string, ok: boolean, detail?: string): void {
+  const mark = ok ? "✓" : "○";
+  process.stdout.write(`${mark} ${label}${detail !== undefined ? ` — ${detail}` : ""}\n`);
+}
+
+function renderProject(project: Awaited<ReturnType<typeof detectProject>>): void {
+  if (project.languages.length > 0) printCheck(`${project.languages.join(", ")} project`, true, project.packageManager ?? undefined);
+  else printCheck("project", false, "no recognized project manifest — the workspace still works on plain files");
+  if (project.monorepo) printCheck("monorepo", true);
+}
+
+function renderAgents(agents: readonly DiscoveredIntegration[]): void {
+  const found = detectedAgents(agents);
+  if (found.length === 0) {
+    process.stdout.write("○ No coding agents detected — install one (codex, claude, opencode, gemini, dsh) or keep using this workspace for verification only.\n");
+    return;
+  }
+  for (const agent of found) {
+    printCheck(agent.name, true, `tier: ${agent.tier}${agent.command !== undefined ? ` — launch: ${agent.command}` : ""}`);
+  }
+}
+
+function renderVerification(plan: Awaited<ReturnType<typeof inferVerification>>): void {
+  if (plan.checks.length === 0) {
+    process.stdout.write("○ No verification detected — add scripts (lint/typecheck/test/build) to package.json or commands to .paw/workspace.yaml.\n");
+    return;
+  }
+  for (const check of plan.checks) printCheck(check.id, true, check.command);
+}
+
+function renderStatus(projectRoot: string, parsed: ParsedArgs): Promise<number> {
+  return (async () => {
+    const status = await workspaceStatus(projectRoot);
+    if (parsed.json) {
+      process.stdout.write(`${JSON.stringify(status, null, 2)}\n`);
+      return 0;
+    }
+    process.stdout.write(`Workspace\n  ${status.projectRoot}\n`);
+    process.stdout.write(`  ${status.initialized ? "✓ initialized (.paw/)" : "○ not initialized — run `paw init`"}\n`);
+    process.stdout.write("\nRepository\n");
+    if (status.git.repository) process.stdout.write(`  ✓ git (branch: ${status.git.branch ?? "?"}${status.git.dirty ? ", dirty" : ""})\n`);
+    else process.stdout.write("  ○ not a git repository — the workspace works without git\n");
+    process.stdout.write("\nProject\n");
+    renderProject(status.project);
+    process.stdout.write("\nAgents\n");
+    renderAgents(status.agents);
+    process.stdout.write("\nVerification\n");
+    renderVerification(status.verification);
+    if (parsed.flags["verbose"] === true) {
+      process.stdout.write("\nConfiguration\n");
+      for (const source of status.configSources) {
+        process.stdout.write(`  · ${source.layer}${source.file !== undefined ? ` (${source.file})` : ""}\n`);
+      }
+    }
+    return 0;
+  })();
+}
+
+async function runVerify(projectRoot: string, parsed: ParsedArgs): Promise<number> {
+  const { config, sources } = await effectiveConfig(projectRoot, parsed);
+  const commands =
+    (config as { verification?: { commands?: string[] } }).verification?.commands ?? [];
+  if (commands.length === 0) {
+    const payload = { command: "verify", ok: true, results: [], message: "no verification commands detected or configured" };
+    process.stdout.write(`${JSON.stringify(payload, null, 2)}\n`);
+    return 0;
+  }
+  const client = new WorkspaceClient(clientOptions(parsed, config));
+  try {
+    const ws = await client.start();
+    const shell = await client.service(shellService);
+    if (!parsed.json) {
+      process.stdout.write("Verification\n");
+      for (const source of sources) process.stdout.write(`  · config: ${source}\n`);
+    }
+    const results: { check: string; command: string; exitCode: number; durationMs: number }[] = [];
+    for (const command of commands) {
+      if (!parsed.json) process.stdout.write(`  → ${command}\n`);
+      const result = await shell.exec({ command, cwd: projectRoot, timeoutMs: 600_000 });
+      results.push({ check: command, command, exitCode: result.exitCode, durationMs: result.durationMs });
+    }
+    const ok = results.every((r) => r.exitCode === 0);
+    if (parsed.json) {
+      process.stdout.write(`${JSON.stringify({ command: "verify", ok, results, workspace: ws.id }, null, 2)}\n`);
+    } else {
+      for (const r of results) printCheck(r.check, r.exitCode === 0, `${r.exitCode} in ${r.durationMs}ms`);
+      process.stdout.write(`\nResult: ${ok ? "PASS" : "FAIL"}\n`);
+    }
+    return ok ? 0 : 1;
+  } finally {
+    await client.stop();
+  }
+}
+
+/**
+ * Resolve context providers for research from the CLI's own plugin catalog
+ * (spec 149). The SDK never imports concrete plugins (spec 50); the host
+ * wires its catalog into the research options. ACC is OPTIONAL: when it is
+ * not installed/activated, research degrades to repository facts and says so.
+ */
+async function resolveContextProviders(parsed: ParsedArgs): Promise<readonly { id: string; provider: ContextProvider }[]> {
+  const providers: { id: string; provider: ContextProvider }[] = [];
+  const wanted = typeof parsed.flags["context"] === "string"
+    ? parsed.flags["context"].split(",").map((s) => s.trim()).filter(Boolean)
+    : (process.env.PAW_RESEARCH_CONTEXT ?? "acc").split(",").map((s) => s.trim()).filter(Boolean);
+  if (!wanted.includes("acc")) return providers;
+  try {
+    const { WorkspaceClient: Client } = await import("@proagents/workspace");
+    const client = new Client({
+      config: {
+        approval: { mode: "autonomous" },
+        tools: ["filesystem"],
+        plugins: [{ id: "filesystem", options: { root: process.cwd() } }],
+        context: { providers: ["acc"] },
+        permissions: { filesystem: { read: [process.cwd()], write: [] } },
+      },
+      plugins: [accContextPlugin],
+      catalog: true,
+    });
+    try {
+      const provider = await client.service(researchContextService);
+      providers.push({ id: "acc", provider });
+    } catch {
+      // ACC unavailable → honest degradation (research continues without it).
+    } finally {
+      await client.stop();
+    }
+  } catch {
+    // Boot failure → honest degradation.
+  }
+  return providers;
+}
+
+function usage(): string {
+  return [
+    "paw — the convention-first workspace for AI coding agents",
+    "",
+    "Usage: paw <command> [args] [--json] [--headless]",
+    "",
+    "Commands:",
+    "  init          Make the current repository Workspace-aware (.paw/)",
+    "  status        Where am I, what is here, what is possible",
+    "  research      Discover product/environment facts (ACC-aware), ask what's missing",
+    "  doctor        Health of the workspace and its providers",
+    "  verify        Run detected/configured verification (lint, test, build)",
+    "  diff          Git working-tree diff (requires git)",
+    "  agent list    Detected coding agents and their integration tier",
+    "  config show   Effective configuration and where each layer came from",
+    "  plugin list   Registered plugins and their capabilities",
+    "  service list  Registered capability services",
+    "  desktop       Open the optional control-room UI (never required)",
+    "",
+    "Isolated workspaces (optional, progressive):",
+    "  paw workspace create [--runtime docker|e2b] [--repo <ref>]",
+    "",
+    "Global flags: --json (machine-readable), --headless (fail closed on approvals)",
+    "",
+    "No runtime, cloud account, or desktop application is required.",
+  ].join("\n");
+}
+
 async function main(): Promise<number> {
   const parsed = parseArgs(process.argv.slice(2));
+  const projectRoot = process.cwd();
 
   if (parsed.command === undefined || parsed.command === "help" || parsed.flags["help"] === true) {
-    const text = [
-      "paw — the programmable workspace for AI agents",
-      "",
-      "Usage: paw <command> [args] [--json] [--headless]",
-      "",
-      "Commands:",
-      "  doctor        Health of every plugin and provider",
-      "  plugin list   Registered plugins and their capabilities",
-      "  service list  Registered capability services",
-      "  config show   Effective workspace configuration",
-      "  verify        Run the configured verification commands",
-      "",
-      "Global flags: --json (machine-readable), --headless (fail closed on approvals)",
-    ].join("\n");
     if (parsed.json) {
-      process.stdout.write(`${JSON.stringify({ commands: ["doctor", "plugin list", "service list", "config show", "verify"] }, null, 2)}\n`);
+      process.stdout.write(
+        `${JSON.stringify(
+          {
+            commands: [
+              "init", "status", "research", "doctor", "verify", "diff", "agent list", "config show",
+              "plugin list", "service list", "desktop", "workspace create",
+            ],
+          },
+          null,
+          2
+        )}\n`
+      );
     } else {
-      process.stdout.write(`${text}\n`);
+      process.stdout.write(`${usage()}\n`);
     }
     return 0;
   }
 
-  const client = new WorkspaceClient(clientOptions(parsed));
+  // Bare `paw` (Level 0): explain what is available WITHOUT initializing.
+  // Zero configuration required; nothing is written to the repository.
+  if (parsed.command === "bare") {
+    const status = await workspaceStatus(projectRoot);
+    if (parsed.json) {
+      process.stdout.write(`${JSON.stringify(status, null, 2)}\n`);
+      return 0;
+    }
+    renderProject(status.project);
+    renderAgents(status.agents);
+    if (!status.initialized) {
+      process.stdout.write("\nThis repository is not Workspace-aware yet. Run `paw init` (creates .paw/ only — source code is untouched).\n");
+    }
+    return 0;
+  }
 
   try {
     switch (parsed.command) {
-      case "doctor": {
-        const report = await client.doctor();
+      case "init": {
+        const result = await initWorkspace(projectRoot);
         if (parsed.json) {
-          process.stdout.write(`${JSON.stringify({ command: "doctor", entries: report }, null, 2)}\n`);
-        } else {
-          for (const entry of report) {
-            process.stdout.write(`${entry.pluginId.padEnd(20)} ${entry.health.status.padEnd(12)} ${entry.health.message}\n`);
-          }
-          if (report.length === 0) process.stdout.write("No plugins report health.\n");
+          process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
+          return 0;
         }
-        const unhealthy = report.filter((r) => r.health.status === "unavailable").length;
-        return unhealthy > 0 ? 1 : 0;
-      }
-
-      case "plugin": {
-        if (parsed.args[0] !== "list") {
-          process.stderr.write("usage: paw plugin list [--json]\n");
-          return 2;
-        }
-        const plugins = await client.pluginList();
-        if (parsed.json) {
-          process.stdout.write(`${JSON.stringify({ command: "plugin list", plugins }, null, 2)}\n`);
-        } else {
-          for (const p of plugins) {
-            process.stdout.write(`${p.id.padEnd(20)} v${p.version.padEnd(8)} ${p.capabilities.join(", ")}\n`);
-          }
+        renderProject(result.project);
+        for (const agent of result.agents) printCheck(agent.name, true, `tier: ${agent.tier}`);
+        if (result.agents.length === 0) process.stdout.write("○ No coding agents detected\n");
+        process.stdout.write("\nProAgents Workspace initialized.\n");
+        process.stdout.write("\nCreated:\n");
+        for (const file of result.created) process.stdout.write(`  ${file}\n`);
+        process.stdout.write("\nNo runtime required.\nNo cloud account required.\nNo desktop application required.\n");
+        process.stdout.write("\nRun:\n  paw doctor\n  paw verify\n");
+        const agents = detectedAgents(await discoverEnvironment(projectRoot));
+        if (agents.length > 0) {
+          process.stdout.write(`  ${agents[0]!.command ?? agents[0]!.id}   # your existing agent keeps working\n`);
         }
         return 0;
       }
 
-      case "service": {
-        if (parsed.args[0] !== "list") {
-          process.stderr.write("usage: paw service list [--json]\n");
+      case "status":
+        return await renderStatus(projectRoot, parsed);
+
+      case "doctor": {
+        const status = await workspaceStatus(projectRoot);
+        const { config } = await effectiveConfig(projectRoot, parsed);
+        let doctor: Awaited<ReturnType<WorkspaceClient["doctor"]>> = [];
+        if (isInitialized(projectRoot)) {
+          const client = new WorkspaceClient(clientOptions(parsed, config));
+          try {
+            doctor = await client.doctor();
+          } finally {
+            await client.stop();
+          }
+        }
+        if (parsed.json) {
+          process.stdout.write(`${JSON.stringify({ command: "doctor", status, doctor }, null, 2)}\n`);
+          return 0;
+        }
+        process.stdout.write("ProAgents Workspace Doctor\n\n");
+        process.stdout.write("Workspace\n");
+        printCheck(status.initialized ? "initialized" : "not initialized", status.initialized, status.initialized ? pawDirFor(projectRoot) : "run `paw init`");
+        process.stdout.write("\nRepository\n");
+        printCheck("git repository", status.git.repository, status.git.branch);
+        process.stdout.write("\nProject\n");
+        renderProject(status.project);
+        process.stdout.write("\nAgents\n");
+        renderAgents(status.agents);
+        process.stdout.write("\nVerification\n");
+        renderVerification(status.verification);
+        if (doctor.length > 0) {
+          process.stdout.write("\nProviders\n");
+          for (const entry of doctor) {
+            process.stdout.write(`  ${entry.pluginId.padEnd(16)} ${entry.health.status.padEnd(12)} ${entry.health.message}\n`);
+          }
+        }
+        process.stdout.write("\n");
+        const optional = status.agents.filter((a) => !a.detected && (a.kind === "context-framework" || a.kind === "runtime"));
+        if (optional.length > 0) {
+          process.stdout.write("Optional\n");
+          for (const item of optional.slice(0, 6)) printCheck(item.name, false, "not installed — optional");
+        }
+        process.stdout.write("\nEverything required is ready.\n");
+        return 0;
+      }
+
+      case "verify":
+        return await runVerify(projectRoot, parsed);
+
+      case "diff": {
+        const { execFile } = await import("node:child_process");
+        const { promisify } = await import("node:util");
+        const runGit = promisify(execFile);
+        try {
+          const { stdout } = await runGit("git", ["diff"], { cwd: projectRoot, maxBuffer: 16 * 1024 * 1024 });
+          process.stdout.write(stdout);
+          return 0;
+        } catch (error) {
+          const err = error as { code?: number; stderr?: string };
+          if (err.code === 1 && err.stderr === undefined) {
+            return 1; // git diff exit 1 = differences found with --exit-code only
+          }
+          throw new WorkspaceError({
+            code: "GIT_COMMAND_FAILED",
+            message: err.stderr?.trim() || "git diff failed — is this a git repository?",
+            provider: "git",
+            recoverable: true,
+            suggestions: ["Run `git init` to create a repository, or use `paw status` for a non-git workspace"],
+          });
+        }
+      }
+
+      case "research": {
+        // Integration point with the ACC/ProAgents ecosystems (spec 149):
+        // context providers first, then product questions, then artifacts.
+        // Agent-level professional requirements are handed to ProAgents via
+        // `.paw/proagents/requirements.json` — PAW never invents skills/rules.
+        if (!isInitialized(projectRoot)) {
+          throw new WorkspaceError({
+            code: "PROJECT_NOT_INITIALIZED",
+            message: "Research runs on an initialized Workspace.",
+            recoverable: true,
+            suggestions: ["Run `paw init` first"],
+          });
+        }
+        // Subcommand: `paw research answer <question-id> <answer>` — applies
+        // one answer to the persisted model (interview loop, resumable).
+        if (parsed.args[0] === "answer") {
+          const questionId = parsed.args[1];
+          const answer = parsed.args.slice(2).join(" ");
+          if (questionId === undefined || answer.length === 0) {
+            process.stderr.write("usage: paw research answer <question-id> <answer> [--json]\n");
+            return 2;
+          }
+          if (!hasResearch(projectRoot)) {
+            throw new WorkspaceError({
+              code: "PROJECT_NOT_INITIALIZED",
+              message: "No research model found — run `paw research` first.",
+              recoverable: true,
+              suggestions: ["Run `paw research`"],
+            });
+          }
+          const { readFile } = await import("node:fs/promises");
+          const model = JSON.parse(await readFile(researchModelPath(projectRoot), "utf8")) as ResearchModel;
+          const updated = answerQuestion(model, questionId, answer);
+          const { writeFile: wf } = await import("node:fs/promises");
+          await wf(researchModelPath(projectRoot), `${JSON.stringify(updated, null, 2)}\n`, "utf8");
+          const remaining = deriveQuestions(updated);
+          if (parsed.json) {
+            process.stdout.write(`${JSON.stringify({ command: "research answer", answered: questionId, remaining: remaining.length, model: updated }, null, 2)}\n`);
+          } else {
+            process.stdout.write(`✓ ${questionId} answered.\n`);
+            process.stdout.write(remaining.length === 0 ? "Research complete — no open questions.\n" : `${remaining.length} question(s) remaining:\n`);
+            for (const q of remaining) process.stdout.write(`  · ${q.question}\n`);
+          }
+          return 0;
+        }
+        if (parsed.args[0] === "status") {
+          if (!hasResearch(projectRoot)) {
+            process.stdout.write(`${JSON.stringify({ command: "research status", exists: false }, null, 2)}\n`);
+            return 0;
+          }
+          const { readFile } = await import("node:fs/promises");
+          const model = JSON.parse(await readFile(researchModelPath(projectRoot), "utf8")) as ResearchModel;
+          process.stdout.write(`${JSON.stringify({ command: "research status", exists: true, open: deriveQuestions(model).length, model }, null, 2)}\n`);
+          return 0;
+        }
+        const contextProviders = await resolveContextProviders(parsed);
+        const result = await runResearch(projectRoot, { contextProviders });
+        if (parsed.json) {
+          process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
+          return 0;
+        }
+        process.stdout.write("Workspace Research\n\nDetected\n");
+        for (const fact of result.model.facts) {
+          process.stdout.write(`  ${fact.key}: ${fact.value} (${fact.source}${fact.origin !== undefined ? `: ${fact.origin}` : ""})\n`);
+        }
+        if (result.contexts.note !== undefined) process.stdout.write(`  ${result.contexts.note}\n`);
+        process.stdout.write("\nOpen questions\n");
+        if (result.model.questions.length === 0) {
+          process.stdout.write("  (none — the environment answered everything it could)\n");
+        } else {
+          for (const q of result.model.questions) {
+            process.stdout.write(`  · ${q.question}\n      why: ${q.why}\n`);
+          }
+        }
+        process.stdout.write("\nArtifacts\n");        
+        for (const file of result.artifacts) process.stdout.write(`  ${file}\n`);
+        process.stdout.write("\nAgent requirements were handed to ProAgents (.paw/proagents/requirements.json).\n");
+        return 0;
+      }
+
+      case "agent": {
+        const sub = parsed.args[0] ?? "list";
+        if (sub !== "list") {
+          process.stderr.write("usage: paw agent list [--json]\n");
           return 2;
         }
-        const services = await client.serviceList();
+        const agents = detectedAgents(await discoverEnvironment(projectRoot));
         if (parsed.json) {
-          process.stdout.write(`${JSON.stringify({ command: "service list", services }, null, 2)}\n`);
-        } else {
-          for (const s of services) {
-            process.stdout.write(`${s.id.padEnd(20)} contract ${s.contractVersion.padEnd(8)} by ${s.pluginId}\n`);
-          }
+          process.stdout.write(`${JSON.stringify({ command: "agent list", agents }, null, 2)}\n`);
+          return 0;
+        }
+        if (agents.length === 0) {
+          process.stdout.write("No coding agents detected. Install one: codex, claude, opencode, gemini, dsh.\n");
+          return 0;
+        }
+        for (const agent of agents) {
+          process.stdout.write(`${agent.name.padEnd(20)} tier: ${agent.tier}${agent.command !== undefined ? `  launch: ${agent.command}` : ""}\n`);
         }
         return 0;
       }
@@ -191,32 +581,91 @@ async function main(): Promise<number> {
           process.stderr.write("usage: paw config show [--json]\n");
           return 2;
         }
-        const config = await client.effectiveConfig();
-        process.stdout.write(`${JSON.stringify(config, null, 2)}\n`);
+        const { config, sources } = await effectiveConfig(projectRoot, parsed);
+        process.stdout.write(`${JSON.stringify({ config, sources }, null, 2)}\n`);
         return 0;
       }
 
-      case "verify": {
-        // Verification runs the configured commands through the verification
-        // capability once a runtime plugin is active; guarded by approval.
-        const ws = await client.start();
-        const config = ws.config;
-        const commands = config.verification?.commands ?? [];
-        if (commands.length === 0) {
-          process.stdout.write(
-            `${JSON.stringify({ command: "verify", ok: true, results: [], message: "no verification commands configured" }, null, 2)}\n`
-          );
+      case "plugin": {
+        if (parsed.args[0] !== "list") {
+          process.stderr.write("usage: paw plugin list [--json]\n");
+          return 2;
+        }
+        const { config } = await effectiveConfig(projectRoot, parsed);
+        const client = new WorkspaceClient(clientOptions(parsed, config));
+        try {
+          const plugins = await client.pluginList();
+          if (parsed.json) {
+            process.stdout.write(`${JSON.stringify({ command: "plugin list", plugins }, null, 2)}\n`);
+          } else {
+            for (const p of plugins) {
+              process.stdout.write(`${p.id.padEnd(20)} v${p.version.padEnd(8)} ${p.capabilities.join(", ")}\n`);
+            }
+          }
           return 0;
+        } finally {
+          await client.stop();
         }
-        const shell = await client.service(shellService);
-        const results: { command: string; exitCode: number; durationMs: number }[] = [];
-        for (const command of commands) {
-          const result = await shell.exec({ command, timeoutMs: 600_000 });
-          results.push({ command, exitCode: result.exitCode, durationMs: result.durationMs });
+      }
+
+      case "service": {
+        if (parsed.args[0] !== "list") {
+          process.stderr.write("usage: paw service list [--json]\n");
+          return 2;
         }
-        const ok = results.every((r) => r.exitCode === 0);
-        process.stdout.write(`${JSON.stringify({ command: "verify", ok, results }, null, 2)}\n`);
-        return ok ? 0 : 1;
+        const { config } = await effectiveConfig(projectRoot, parsed);
+        const client = new WorkspaceClient(clientOptions(parsed, config));
+        try {
+          const services = await client.serviceList();
+          if (parsed.json) {
+            process.stdout.write(`${JSON.stringify({ command: "service list", services }, null, 2)}\n`);
+          } else {
+            for (const s of services) {
+              process.stdout.write(`${s.id.padEnd(20)} contract ${s.contractVersion.padEnd(8)} by ${s.pluginId}\n`);
+            }
+          }
+          return 0;
+        } finally {
+          await client.stop();
+        }
+      }
+
+      case "desktop":
+      case "open": {
+        // The desktop application is a projection over the Workspace API —
+        // optional by definition (spec sections 4/28). It is not installed
+        // with the core CLI; report honestly instead of failing silently.
+        const payload = {
+          command: "desktop",
+          available: false,
+          message: "The control-room UI (@proagents/ui) is an optional projection over the Workspace API and is not part of the core CLI install.",
+          suggestion: "Run `pnpm ui` in a checkout of proagents-workspace, or use `paw status` / `paw verify` in the terminal.",
+        };
+        if (parsed.json) process.stdout.write(`${JSON.stringify(payload, null, 2)}\n`);
+        else process.stdout.write(`${payload.message}\n${payload.suggestion}\n`);
+        return 0;
+      }
+
+      case "workspace": {
+        const sub = parsed.args[0];
+        if (sub !== "create") {
+          process.stderr.write("usage: paw workspace create [--runtime docker|e2b] [--repo <ref>] [--headless]\n");
+          return 2;
+        }
+        // Progressive capability (spec sections 6/23): isolated runtimes are
+        // opt-in infrastructure. V1 resolves the declaration and reports the
+        // honest security model instead of pretending isolation exists.
+        const runtime = typeof parsed.flags["runtime"] === "string" ? parsed.flags["runtime"] : "docker";
+        const payload = {
+          command: "workspace create",
+          runtime,
+          repo: typeof parsed.flags["repo"] === "string" ? parsed.flags["repo"] : undefined,
+          isolation: runtime === "local" ? "host-level (NOT a sandbox)" : "provider-defined container isolation",
+          note: "Isolated runtime provisioning arrives with the runtime milestones; this command reports the requested target honestly.",
+        };
+        if (parsed.json) process.stdout.write(`${JSON.stringify(payload, null, 2)}\n`);
+        else process.stdout.write(`Runtime: ${payload.runtime}\nIsolation: ${payload.isolation}\n${payload.note}\n`);
+        return 0;
       }
 
       default: {
@@ -248,8 +697,6 @@ async function main(): Promise<number> {
       )}\n`
     );
     return 2;
-  } finally {
-    await client.stop();
   }
 }
 

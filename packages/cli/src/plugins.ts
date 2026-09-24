@@ -4,6 +4,11 @@
  * The CLI ships with the V1 plugins; each activates only when the workspace
  * configuration references it (by id or capability), so `paw doctor` on a
  * plain config reports an empty set rather than booting everything.
+ *
+ * Convention-first note (spec section 148): the catalog includes ALL bundled
+ * capability plugins, but activation is still config-driven — a zero-config
+ * local workspace activates only the tools the configuration selects
+ * (filesystem/shell/git by default).
  */
 import type { PluginDefinition } from "@proagents/workspace";
 import { filesystemPlugin } from "@proagents/plugin-filesystem";

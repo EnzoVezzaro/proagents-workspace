@@ -25,6 +25,16 @@ and `.proagent/crews/` handoffs (structured, runtime state).
   (see `.acc/config/workflows/agent-coordination.md`).
 - Never put secrets, credentials, or unverified claims here.
 
+## [2026-09-24T14:20:00Z] freebuff — milestone landed (spec §148 + §149)
+For: opencode
+
+User pinned the **convention-first product model** and the **research convergence** with ACC/ProAgents. Landed, spec-first: **§148** (convention-first local mode) + **§149** (workspace research). Code: SDK `conventions.ts` (project/agent/verification detection, config precedence incl. a dependency-free minimal-YAML parser that fails honestly on unsupported syntax, `initWorkspace`, `workspaceStatus`) + SDK `research.ts` (context-provider gather via the existing `ContextProvider` contract, uncertainty→question derivation with provenance, `.paw/research/{research.json,product.md,decisions.md}` + `.paw/proagents/requirements.json` handoff); CLI surface rebuilt around `init/status/research/doctor/verify/diff/agent list/config show/desktop` with lazy kernel boot (simple commands boot NO plugins); contracts: `runtime` now OPTIONAL (host = default runtime) + `version` field + `PROJECT_NOT_INITIALIZED`. KEY BOUNDARY DECISION: the SDK never imports concrete plugins (spec §50) — the CLI host wires its ACC catalog into research options; ACC-owned files (AGENTS.md, .acc/) are consulted, never duplicated into `.paw/`; agent questions are handed to ProAgents, not invented. Breaking-ish: default tool set dropped `git` (zero-config = filesystem+shell; `paw diff` shells out to git directly) — flag if your consumers assumed git in the default scope. Gate: lint 0 · TS 0 · **319/319** · build 0 · acc check = documented ACC014 only; live-verified golden path + research loop on scratch repos. Docs synced (README preamble + §50–55, getting-started, cli-reference, configuration, agent-providers, cli-vocabulary standard, CHANGELOG). Uncommitted with the UI redesign — the one-feature-commit suggestion now covers three milestones.
+
+## [2026-09-23T10:20:00Z] freebuff — note
+For: opencode
+
+UI control-room redesign landed (app/src/public/{index.html,style.css,app.js} only — no server/kernel changes, zero new deps, all element ids preserved so app.js handlers keep working): layered dark theme with new token scale (--bg0..4, accent pair, shadows, --speed/--ease), sidebar with brand logo + selected-item rail, empty-state hero (glow + gradient headline + feature chips + ⌘ hint row), chat header restructured into title/meta rows with compacting buttons (`.btn-label` spans collapse to icons ≤1280px; app.js toggles the span, with fallback to old textContent when absent), views-row wrapper so chat/code/terminal coexist in one flex column, refined buttons/dialogs/tabs/status-bar, `prefers-reduced-motion` honored, focus-visible rings. Gate re-run green after the redesign: lint 0 · TS 0 · 278/278 · build 0; live smoke: / 200, /ui/style.css 200 text/css, /ui/app.js 200 text/javascript, xterm assets 200, /api/health ok. Still uncommitted with the milestone — the one-feature-commit suggestion stands.
+
 ## [2026-09-23T08:30:00Z] freebuff — decision + behavior change
 For: opencode
 

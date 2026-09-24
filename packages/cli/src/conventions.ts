@@ -1,0 +1,43 @@
+/**
+ * Re-export of the SDK convention layer (spec section 148) — the CLI consumes
+ * the same detection/discovery surface as every other integration; it never
+ * duplicates SDK implementation.
+ */
+export {
+  PAW_DIR,
+  CONFIG_FILE,
+  SESSIONS_DIR,
+  pawDirFor,
+  configPathFor,
+  isInitialized,
+  detectProject,
+  inferVerification,
+  discoverEnvironment,
+  detectedAgents,
+  defaultConfig,
+  loadConfig,
+  initWorkspace,
+  workspaceStatus,
+  requireInitialized,
+  runResearch,
+  gatherContexts,
+  answerQuestion,
+  deriveQuestions,
+  hasResearch,
+  researchModelPath,
+  researchContextService,
+  type DetectedProject,
+  type VerificationPlan,
+  type DiscoveredIntegration,
+  type IntegrationKind,
+  type IntegrationTier,
+  type InitResult,
+  type WorkspaceStatus,
+  type LoadedConfig,
+  type ResearchModel,
+  type ResearchFact,
+  type ResearchQuestion,
+  type ResearchResult,
+  type ResearchOptions,
+  type ResearchContexts,
+} from "@proagents/workspace";

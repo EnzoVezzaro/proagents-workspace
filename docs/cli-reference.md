@@ -1,21 +1,52 @@
 # CLI Reference
 
-The CLI is the primary interface to ProAgents Workspace.
+The CLI is the primary interface to ProAgents Workspace — a normal developer CLI, not a platform console.
 
 - **Binary:** `paw`
 - **Package:** `proagents-workspace` (installed via `npm install -g proagents-workspace`)
 
 The CLI uses the same underlying Workspace API as the SDK — the CLI never duplicates SDK implementation.
 
+## The Golden Path (convention-first)
+
+```bash
+paw init          # make the current repository Workspace-aware (.paw/ only)
+paw status        # where am I, what is here, what is possible [--json]
+paw research      # product/environment discovery; ACC-aware [section 149]
+paw doctor        # diagnostics; optional components never appear as failures [--json]
+paw verify        # run detected/configured verification [--json]
+paw diff          # git working-tree diff
+paw agent list    # detected agents + honest integration tiers [--json]
+paw desktop       # optional UI — reports honestly that it is optional
+```
+
+Simple commands do not boot plugins or runtimes; capability activation is lazy. `paw status` answers: where am I, what project is this, what branch, what agents are available, what verification is configured.
+
+## Research Commands (spec section 149)
+
+```bash
+paw research                       # discovery pass + artifacts
+paw research answer <id> <answer>  # apply one interview answer (resumable loop)
+paw research status                # research model state [--json]
+```
+
+Research consults context providers through the existing `ContextProvider` contract (ACC when installed), gathers repository/environment facts, and derives only the product questions the environment cannot answer. Artifacts: `.paw/research/{research.json,product.md,decisions.md}` + `.paw/proagents/requirements.json` (the ProAgents handoff).
+
 ## Command Structure
 
 ```
 paw
+├── init            (convention-first)
+├── status          (convention-first)
+├── research        (convention-first)
+├── doctor          (convention-first)
+├── verify          (convention-first)
+├── diff            (convention-first)
+├── agent
 ├── workspace
 ├── runtime
 ├── repository
 ├── context
-├── agent
 ├── plugin
 ├── git
 ├── pr
@@ -25,7 +56,6 @@ paw
 ├── service
 ├── secret
 ├── snapshot
-├── verify
 ├── logs
 ├── protection
 ├── distribution
@@ -105,6 +135,8 @@ paw verify build
 paw verify lint
 paw verify typecheck
 ```
+
+With no configured commands, `paw verify` infers checks from project conventions (package scripts in the order lint → typecheck → test → build). Configured commands in `.paw/workspace.yaml` win over inference.
 
 See [Verification](verification.md).
 
@@ -186,7 +218,7 @@ paw plugin inspect
 paw doctor
 ```
 
-`paw doctor` diagnoses:
+Optional components (ACC, Docker, E2B) are marked optional — they never appear as failures. `paw doctor` diagnoses:
 
 ```
 runtime connectivity

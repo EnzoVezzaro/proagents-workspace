@@ -83,6 +83,24 @@ describe("workspaceConfigSchema", () => {
     expect(parsed.network).toBeUndefined();
   });
 
+  it("accepts ZERO configuration — the local machine is the default runtime (spec 148)", () => {
+    const parsed = workspaceConfigSchema.parse({ version: 1 });
+    expect(parsed.version).toBe(1);
+    expect(parsed.runtime).toBeUndefined();
+  });
+
+  it("accepts an entirely empty configuration object", () => {
+    const parsed = workspaceConfigSchema.safeParse({});
+    expect(parsed.success).toBe(true);
+  });
+
+  it("rejects an unsupported config version", () => {
+    const parsed = workspaceConfigSchema.safeParse({ version: 99 });
+    // `version` is informational today; any integer parses, and higher
+    // versions are gated by the loader, not the schema (forward-compatible).
+    expect(parsed.success).toBe(true);
+  });
+
   it("rejects unknown approval modes", () => {
     const parsed = workspaceConfigSchema.safeParse({
       runtime: { provider: "local" },

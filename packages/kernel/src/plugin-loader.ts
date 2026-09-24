@@ -216,7 +216,9 @@ export class PluginLoader {
   private referencedByConfig(manifest: PluginManifest, config: WorkspaceConfig): boolean {
     const provider = manifest.provider ?? manifest.id;
     if ((config.plugins ?? []).some((p) => p.id === manifest.id)) return true;
-    if (config.runtime.provider === manifest.id || config.runtime.provider === provider) return true;
+    // Runtime is optional (convention-first, spec section 148): a local
+    // workspace declares no runtime — the host machine is the runtime.
+    if (config.runtime?.provider === manifest.id || config.runtime?.provider === provider) return true;
     if (config.repository?.provider === manifest.id || config.repository?.provider === provider) return true;
     if (config.agent?.provider === manifest.id || config.agent?.provider === provider) return true;
     if ((config.context?.providers ?? []).some((p) => p === manifest.id || p === provider)) return true;

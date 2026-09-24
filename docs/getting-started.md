@@ -9,100 +9,64 @@ npm install -g proagents-workspace
 paw --version
 ```
 
-Requires Node.js 18+.
+Requires Node.js 18+. No cloud account, API key, Docker, or desktop application is required.
 
-## Create a Workspace
-
-### Basic
+## The Golden Path
 
 ```bash
-paw workspace create
+cd my-project
+paw init
+paw status
+paw verify
+codex        # your existing agent keeps working
 ```
 
-### With Repository
+That is the product. Everything else is progressive.
 
-Connect a repository provider first (one-time):
+## Initialize an Existing Repository
 
 ```bash
-paw github connect
+paw init
 ```
 
-Then:
+Run inside an existing repository. The command:
+
+1. Detects the repository and project (languages, package manager, frameworks)
+2. Detects available coding agents (Codex, Claude Code, OpenCode, Gemini CLI, DeepSeek Harness, …)
+3. Creates minimal Workspace metadata (`.paw/` only)
+4. Detects existing development commands and configures verification
+5. Leaves your source code untouched
+
+Example output:
+
+```text
+✓ TypeScript project — pnpm
+✓ Codex CLI — tier: process
+✓ Claude Code — tier: process
+
+ProAgents Workspace initialized.
+
+Created:
+  .paw/workspace.yaml
+  .paw/sessions
+  .paw/artifacts
+  AGENTS.md          (only when absent — never overwritten)
+
+No runtime required.
+No cloud account required.
+No desktop application required.
+```
+
+`paw init` never overwrites project files, never rewrites `package.json`, and never changes Git state. Existing `AGENTS.md` and `.acc/` files stay owned by their existing owners.
+
+## Status and Doctor
 
 ```bash
-paw workspace create \
-  --repo github:acme/my-project \
-  --branch feature/auth
+paw status      # where am I, what is here, what is possible
+paw doctor      # diagnostics; optional components are marked optional, never failed
 ```
 
-### With Runtime
-
-```bash
-paw workspace create --runtime docker --image node:22
-paw workspace create --runtime e2b
-paw workspace create --runtime local
-```
-
-## Workspace Creation Output
-
-```
-Creating workspace...
-
-✓ Runtime selected
-✓ Workspace created
-✓ Repository connected
-✓ Repository cloned
-✓ Project detected
-✓ Dependencies prepared
-✓ Context provider initialized
-✓ Agent connected
-
-Workspace ready.
-
-Path:
-  /workspace/repo
-
-Repository:
-  acme/my-project
-
-Branch:
-  feature/auth
-
-Agent:
-  codex
-
-Context:
-  acc
-```
-
-## Start an Agent
-
-```bash
-paw agent start codex
-# or
-paw agent start claude
-# or
-paw agent start opencode
-```
-
-## Work in the Workspace
-
-The agent operates in `/workspace/repo` and can:
-
-- Inspect files
-- Search code
-- Modify files
-- Execute commands
-- Install dependencies
-- Run tests
-- Run builds
-- Start services
-- Inspect logs
-- Use configured tools
-- Use context providers
-- Create commits
-- Push branches
-- Create pull requests
+Both support `--json`.
 
 ## Verify Changes
 
@@ -110,36 +74,56 @@ The agent operates in `/workspace/repo` and can:
 paw verify
 ```
 
-See [Verification](verification.md).
+With no configuration, verification is inferred from project conventions (package scripts: lint → typecheck → test → build). Configure explicit commands in `.paw/workspace.yaml` when you want to override:
 
-## Commit & Push
-
-```bash
-paw git status
-paw git diff
-paw git commit
-paw git push
-paw pr create
+```yaml
+version: 1
+verification:
+  commands:
+    - pnpm lint
+    - pnpm test
 ```
 
-## Export Workspace
+## Use Your Existing Agent
+
+The Workspace improves the environment around the agent; it does not replace the agent:
 
 ```bash
-paw workspace export ws_123
-# Produces workspace.yaml
+paw agent list   # detected agents + integration tiers
+codex            # keeps working exactly as before
+claude
+opencode
 ```
 
-## Recreate Workspace
+## Research (optional, product/environment discovery)
 
 ```bash
-paw workspace create --from workspace.yaml
+paw research                       # consults context providers (ACC) + repository facts
+paw research answer product-goal "A CLI that ships faster"
+paw research status
 ```
+
+Artifacts land in `.paw/research/` and agent requirements are handed to ProAgents via `.paw/proagents/requirements.json` (see [Agent Providers](agent-providers.md#proagents-integration-official)). See spec section 149.
+
+## Isolated Workspaces (optional, progressive)
+
+The default mode operates directly on the current repository. When you need isolation (CI, untrusted or parallel agents), create an explicit isolated workspace:
+
+```bash
+paw workspace create \
+  --repo github:acme/my-project \
+  --runtime docker \
+  --branch feature/auth
+```
+
+Runtimes: `local` (default, host-level — NOT a sandbox), `docker`, `e2b`.
 
 ## Next Steps
 
-- [Configuration](configuration.md) — full workspace definition reference
-- [Runtime Providers](runtime-providers.md) — E2B, Docker, local
-- [Context Providers](context-providers.md) — give your agent code understanding (ACC)
-- [Agent Providers](agent-providers.md) — connect Codex, Claude, OpenCode, Gemini
+- [Configuration](configuration.md) — minimal config, precedence, full reference
 - [CLI Reference](cli-reference.md) — every command
+- [Verification](verification.md) — the verification loop
+- [Agent Providers](agent-providers.md) — connect Codex, Claude, OpenCode, Gemini
+- [Runtime Providers](runtime-providers.md) — isolated runtimes (opt-in)
+- [Context Providers](context-providers.md) — ACC and other context providers (optional)
 - [Security](security.md) — permissions, approval modes, network policy

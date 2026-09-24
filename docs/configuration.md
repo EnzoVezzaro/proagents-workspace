@@ -1,5 +1,35 @@
 # Configuration
 
+## Minimal configuration (convention-first)
+
+A basic project needs only:
+
+```yaml
+version: 1
+```
+
+Store it at `.paw/workspace.yaml`. Everything else — verification commands, agent detection, project shape — is **inferred locally** from existing project files (`package.json`, `pyproject.toml`, `Cargo.toml`, …) before you are asked to configure anything (spec section 148).
+
+## Configuration precedence
+
+Applied last-wins, in this order:
+
+```text
+built-in defaults
+      ↓
+global user config (~/.paw/config.yaml)
+      ↓
+project config (.paw/workspace.yaml)
+      ↓
+workspace profile
+      ↓
+environment (PAW_* variables)
+      ↓
+CLI flags
+```
+
+`paw config show` prints the effective configuration and where each layer came from.
+
 ## Workspace Definition
 
 A Workspace definition captures:
@@ -93,7 +123,27 @@ mcp:
 
 ## Workspace Filesystem Structure
 
+### Local project mode (default)
+
+`paw init` creates ONLY workspace metadata, clearly separated from source code:
+
+```text
+my-project/
+├── src/                # your code — untouched
+├── package.json        # your manifest — untouched
+└── .paw/
+    ├── workspace.yaml  # minimal configuration (version: 1 is valid)
+    ├── research/       # paw research artifacts (spec section 149)
+    ├── proagents/      # ProAgents handoff (requirements.json)
+    ├── sessions/       # append-only session logs (spec section 143)
+    └── artifacts/
 ```
+
+The developer's repository is never cloned, moved, or rewritten. Existing `AGENTS.md`/`.acc/` files are owned by their existing owners and never duplicated into `.paw/`.
+
+### Isolated workspace mode (opt-in)
+
+```text
 /workspace
 ├── repo/           # Repository code
 ├── context/        # Context provider data

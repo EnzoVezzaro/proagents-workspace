@@ -20,32 +20,39 @@ npm install -g proagents-workspace
 
 Requires Node.js 18+.
 
-## Command Structure (spec sections 50–55)
+## Command Structure (spec sections 50–55, 148)
 
 ```text
 paw
+├── init ├── status ├── research ├── doctor ├── verify ├── diff   (convention-first surface)
 ├── workspace ├── runtime ├── repository ├── context
 ├── agent ├── plugin ├── git ├── pr
 ├── exec ├── shell ├── terminal ├── service
-├── secret ├── snapshot ├── verify ├── logs
+├── secret ├── snapshot ├── logs
 ├── protection ├── distribution └── config
 ```
 
 Key commands every document must agree on:
 
 ```bash
+paw init                                   # convention-first: initialize current repository
+paw status | research | doctor | verify | diff   # convention-first surface (current repo)
+paw agent list                             # detected agents + integration tiers
+paw research answer <id> <answer>          # interview loop
 paw workspace create [--repo] [--branch] [--runtime] [--image] [--from] [--headless]
-paw workspace export <id>          # produces workspace.yaml
+paw workspace export <id>                  # produces workspace.yaml
 paw workspace create --from workspace.yaml
 paw agent start <provider>
 paw context status | rebuild | query | inspect
-paw verify                         # NOT `paw verification run`
+paw verify                                 # NOT `paw verification run`
 paw git status | diff | commit | push
 paw pr create
 paw doctor
 paw protection status | audit | rules | inspect
 paw distribution inspect | prepare | publish | verify
 ```
+
+Ergonomic rule (spec section 148): `paw verify`, `paw diff`, `paw status` operate on the CURRENT repository — never write `paw workspace verify`, `paw workspace diff`, `paw workspace status`. The `workspace` noun is reserved for isolated workspaces.
 
 ## Interface Rules
 
@@ -66,9 +73,11 @@ paw distribution inspect | prepare | publish | verify
 ## Workspace Vocabulary
 
 - `workspace.yaml` — the declarative workspace definition (reproducibility: export → create --from).
+- `.paw/workspace.yaml` — the minimal convention-first project configuration (spec section 148); `version: 1` alone is valid.
+- **Workspace** (default) = the developer's project environment; **isolated/runtime workspace** = the explicit sandboxed mode (spec section 148). Never use "workspace" alone for the sandboxed mode.
 - Providers: `runtime` (e2b, docker, local), `repository` (github, gitlab, git), `context` (acc), `agent` (codex, claude, opencode, gemini, proagent).
 - Protection: provider `repo-shield`; Distribution: provider `reposell`.
-- Workspace filesystem: `/workspace/repo` (repository), `/workspace/.proagents/` (metadata).
+- Local project mode filesystem: `.paw/` metadata alongside the developer's untouched source. Isolated mode filesystem: `/workspace/repo` (repository), `/workspace/.proagents/` (metadata).
 
 ## Validation
 

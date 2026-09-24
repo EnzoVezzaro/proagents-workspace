@@ -246,13 +246,30 @@ export const networkModeSchema = z.enum([
   "unrestricted",
 ]);
 
+/**
+ * Configuration file version (convention-first product model, spec section
+ * 148): a minimal `.paw/workspace.yaml` may contain only `version: 1` —
+ * everything else is inferred locally. Absent `version` is accepted for
+ * backward compatibility with pre-convention configuration.
+ */
+export const WORKSPACE_CONFIG_VERSION = 1;
+
 export const workspaceConfigSchema = z.object({
+  /** Config schema version; `1` is the only supported value today. */
+  version: z.number().int().optional(),
   workspaceApi: semverRangeSchema.optional(),
-  runtime: z.object({
-    provider: z.string().min(1),
-    image: z.string().optional(),
-    options: z.record(z.string(), z.unknown()).optional(),
-  }),
+  /**
+   * OPTIONAL since the convention-first model (spec section 148): a local
+   * workspace needs no runtime declaration — the host machine IS the
+   * runtime. Declared runtimes (docker, e2b, …) opt into isolated mode.
+   */
+  runtime: z
+    .object({
+      provider: z.string().min(1),
+      image: z.string().optional(),
+      options: z.record(z.string(), z.unknown()).optional(),
+    })
+    .optional(),
   repository: z
     .object({
       provider: z.string().min(1),
