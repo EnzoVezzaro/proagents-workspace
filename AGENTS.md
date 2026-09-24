@@ -83,6 +83,7 @@ See `docs/architecture.md` for the full picture and `docs/` for the complete doc
 - See `.acc/config/workflows/testing.md` for writing tests (contract, integration, e2e).
 - See `.acc/config/workflows/security-review.md` for the security review gate.
 - See `.acc/config/workflows/agent-coordination.md` for the cross-agent comment channel (`.agents/COMMENTS.md`).
+- See `install/AGENT.md` for the agent bootstrap/init protocol this repository ships to external coding agents, and `install/manifest.yaml` + `install/install.yaml` for the machine-readable install contract (spec section 152).
 
 ## Standards
 
@@ -142,6 +143,7 @@ When modifying this repository:
 7. Validate after changes: `acc check` for contract integrity, and verify every Markdown link in `docs/` resolves. Code changes additionally require `pnpm lint && pnpm typecheck && pnpm test && pnpm build`.
 8. Record durable lessons in `.acc-memory.md` (use `acc memory add .`); record interruptions and corrections under "Interrupts & Corrections".
 9. The CLI is `paw` (package `proagents-workspace`) — keep command examples consistent across all documents.
+10. **Bootstrap / init process (spec section 152):** when asked to "setup ProAgents Workspace" in ANY repository — or to initialize a workspace from a file — follow the universal bootstrap protocol in `install/AGENT.md` (part of this repository's `install/` contract folder). Run the deterministic installer declared in `install/manifest.yaml` for the zero-install five-phase bootstrap, or `paw init README.md` / `paw install <file>` when the CLI is available — both persist the inferred project intent as the `project:` block in `.paw/workspace.yaml`. Never hand-create `.paw/` files when the installer can do it deterministically; the machine-readable contract (`install/install.yaml`) pins what is written and what is never touched.
 
 <!-- proagent:profile:start edaa05e1adb0 -->
 # Professional Profile: Staff Engineer + Security Engineer + Technical Writer + Backend Engineer + DevOps Engineer + QA Engineer + Site Reliability Engineer + Release Engineer

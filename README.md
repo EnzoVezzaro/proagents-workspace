@@ -5287,6 +5287,26 @@ project:
 
 Rules: manifest evidence always appears in `derivedFrom` alongside the source file; a source file that cannot be read is a structured `INTENT_SOURCE_UNREADABLE` error (the config must never silently lie about what it understood); an already-initialized workspace keeps its existing config (the file-driven path is part of the same idempotency contract).
 
+## The init process (what agents and humans actually run)
+
+Every path ends in the same deterministic, idempotent machine — pick by context:
+
+| Context | Command | Source of intent |
+|---------|---------|------------------|
+| No CLI installed, agent-led (the canonical UX) | `npx @reposell/proagents-workspace@latest install` | `@README.md` + manifests (default) |
+| No CLI installed, specific file | `npx @reposell/proagents-workspace@latest install BRIEF.md` | that file + manifests |
+| `paw` already installed, specific file | `paw init README.md` or `paw install <file>` | that file + manifests |
+| `paw` already installed, inference only | `paw init` | manifests + environment (no README prose) |
+| Re-initialize / inspect afterward | `paw status` | the effective picture (idempotent no-op re-runs) |
+
+The process for an agent, in order (full protocol in `install/AGENT.md`):
+
+1. Read the target's `README.md` and existing agent instructions (preserve them — never overwrite).
+2. Run the installer (`npx @reposell/proagents-workspace@latest install [file]`, or `paw init <file>` when installed) — the five phases: inspect → understand → initialize → configure → verify.
+3. Report the resulting configuration: the five-phase report, the persisted `project:` block, the verification plan, the lifecycle (`paw lifecycle show`).
+
+The machine-readable statements of this process live in the `install/` folder of this repository — `install/manifest.yaml` (package metadata + install command), `install/install.yaml` (the contract as data: phases, writes, nevers), `install/AGENT.md` (the protocol an external agent follows), `install/instructions.md` (the human-facing guide). Documentation: [Agent Bootstrap](docs/bootstrap.md).
+
 ## What an install never does
 
 - Modifies application code, rewrites `package.json`, or changes git state.

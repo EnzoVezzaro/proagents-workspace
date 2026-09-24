@@ -52,6 +52,19 @@ repo/
 > universal bootstrap protocol; `npx @reposell/proagents-workspace@latest`
 > is the deterministic installer; `.paw/` is the runtime configuration.
 
+## The init process — every path, one machine
+
+| Context | Command |
+|---------|---------|
+| Agent-led, no CLI installed (canonical) | `npx @reposell/proagents-workspace@latest install README.md` |
+| `paw` installed, init from a file | `paw init README.md` (or `paw install <file>`) |
+| `paw` installed, plain init | `paw init` |
+| Inspect after init | `paw status` |
+
+All paths run the same five-phase contract and end with the same layout
+above; the file argument makes the intent explicit and persists it as the
+`project:` block in `.paw/workspace.yaml`.
+
 ## Flags
 
 ```bash
@@ -61,3 +74,13 @@ npx @reposell/proagents-workspace@latest install --verify    # also run verifica
 
 Already initialized? Running install again is a no-op (idempotent) — use
 `paw init` / `paw status` directly instead.
+
+## The install/ contract folder
+
+The files next to this guide are the machine-readable statements of the
+process above:
+
+- [`manifest.yaml`](manifest.yaml) — package metadata, the installer command, the configuration directory
+- [`install.yaml`](install.yaml) — the install contract as data: the five phases, what is written, what is NEVER touched
+- [`AGENT.md`](AGENT.md) — the protocol an external coding agent follows
+- [`../templates/AGENTS.md`](../templates/AGENTS.md) — the shape of the AGENTS.md generated in the target repository
