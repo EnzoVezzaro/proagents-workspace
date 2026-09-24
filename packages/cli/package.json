@@ -1,6 +1,6 @@
 {
   "name": "proagents-workspace",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "ProAgents Workspace CLI (`paw`) — the convention-first workspace for AI coding agents. Install globally: npm install -g @reposell/proagents-workspace",
   "license": "MIT",
   "type": "module",

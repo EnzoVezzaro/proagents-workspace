@@ -1,6 +1,6 @@
 {
   "name": "@proagents/plugin-repo-shield",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Repo Shield protection provider for ProAgents Workspace — intervenes before execution, never logs after the fact.",
   "license": "MIT",
   "type": "module",

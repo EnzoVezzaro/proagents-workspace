@@ -1,6 +1,6 @@
 {
   "name": "@proagents/plugin-stage-threat-modeling",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Stage plugin contributing THREAT_MODEL after research (spec section 151)",
   "license": "MIT",
   "type": "module",
