@@ -1,6 +1,6 @@
 {
   "name": "@proagents/plugin-lifecycle-security",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Security audit lifecycle definition plugin for ProAgents Workspace — contributes the security-audit lifecycle (understand → static review → threat model → verify → report) as pure data.",
   "license": "MIT",
   "type": "module",

@@ -1,6 +1,6 @@
 {
   "name": "@proagents/plugin-filesystem",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Filesystem capability provider for ProAgents Workspace — sandboxed, permission-checked, protection-aware.",
   "license": "MIT",
   "type": "module",
