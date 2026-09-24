@@ -337,6 +337,7 @@ function usage(): string {
     "  diff          Git working-tree diff (requires git)",
     "  agent list    Detected coding agents and their integration tier",
     "  checkpoint    List/run checkpoint plans with quality gates (spec 150)",
+    "  lifecycle     Show/run the canonical workspace lifecycle (spec 151)",
     "  config show   Effective configuration and where each layer came from",
     "  plugin list   Registered plugins and their capabilities",
     "  service list  Registered capability services",
@@ -375,7 +376,7 @@ async function main(): Promise<number> {
           {
             commands: [
               "init", "status", "research", "doctor", "verify", "diff", "agent list", "checkpoint",
-              "config show", "plugin list", "service list", "workspace create",
+              "lifecycle", "config show", "plugin list", "service list", "workspace create",
             ],
           },
           null,
@@ -652,6 +653,19 @@ async function main(): Promise<number> {
         } finally {
           await client.stop();
         }
+      }
+
+      case "lifecycle": {
+        // Canonical lifecycle (spec section 151): show the composed flow,
+        // run it, or inspect persisted state.
+        const { runLifecycleCommand } = await import("./flow.js");
+        const { config } = await effectiveConfig(projectRoot, parsed);
+        return await runLifecycleCommand(parsed.args[0] ?? "show", {
+          projectRoot,
+          parsed,
+          clientOptions: (cfg: unknown) => clientOptions(parsed, cfg),
+          config,
+        });
       }
 
       case "checkpoint": {

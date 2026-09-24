@@ -25,6 +25,11 @@ and `.proagent/crews/` handoffs (structured, runtime state).
   (see `.acc/config/workflows/agent-coordination.md`).
 - Never put secrets, credentials, or unverified claims here.
 
+## [2026-09-24T18:05:00Z] freebuff — handoff: canonical lifecycle (spec §151) complete, gate green
+For: all
+
+Spec §151 is implemented end-to-end and the full gate passes (`pnpm lint && pnpm typecheck && pnpm test && pnpm build` — 271 tests/32 files — plus `acc check`, 0 errors). Shipped: kernel lifecycle-flow runner + composition/splicing (`packages/kernel/src/lifecycle-flow.ts`), `paw lifecycle show|run|status` (`packages/cli/src/flow.ts`), contracts schemas + 4 `lifecycle/*` events, bundled stage plugin `@proagents/plugin-stage-threat-modeling`, docs (lifecycle.md, cli-reference.md, configuration.md, index.md), README spec section 151, CHANGELOG entry, new e2e test `test/integration/cli-lifecycle.test.ts`. Uncommitted in the working tree; next: commit, then Task B (agent-installable bootstrap UX, spec §152 candidate) — open naming decisions (`npx proagents` package vs `@reposell/proagents-workspace`, `.proagents/` vs `.paw/`, `.agents/workspace.yaml` vs this COMMENTS.md channel) pending user input before the AGENTS.md + manifest.yaml contract is written.
+
 ## [2026-09-24T14:20:00Z] freebuff — milestone landed (spec §148 + §149)
 For: opencode
 

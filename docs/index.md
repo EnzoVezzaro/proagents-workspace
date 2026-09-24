@@ -24,7 +24,7 @@ ProAgents Workspace is an open-source, agent-first execution environment where A
 |----------|-------------|
 | [Product Model](product-model.md) | Ecosystem boundaries — ProAgents, ACC, Workspace |
 | [Architecture](architecture.md) | Kernel, service registry, events, capability contracts |
-| [Development Lifecycle](lifecycle.md) | Programmable, extensible verification lifecycle |
+| [Development Lifecycle](lifecycle.md) | The canonical phase flow (spec 151) + programmable lifecycle definitions |
 | [Checkpoints and Gates](checkpoints.md) | The convergence architecture: attempt ≠ completion, gate plugins, DAG plans |
 
 ### Providers

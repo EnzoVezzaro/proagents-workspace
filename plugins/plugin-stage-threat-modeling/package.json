@@ -1,0 +1,22 @@
+{
+  "name": "@proagents/plugin-stage-threat-modeling",
+  "version": "0.3.0",
+  "description": "Stage plugin contributing THREAT_MODEL after research (spec section 151)",
+  "license": "MIT",
+  "type": "module",
+  "engines": { "node": ">=18" },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@proagents/workspace": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.2"
+  }
+}

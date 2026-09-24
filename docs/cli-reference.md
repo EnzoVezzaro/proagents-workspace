@@ -34,6 +34,16 @@ paw checkpoint status                   # plan state [--json]
 
 Plans load from `.paw/checkpoints.json` (convention) or `checkpoints.plan` in `.paw/workspace.yaml`. Gates are PLUGINS resolved per kind/provider — behavior, security (Repo Shield), human, adversarial, and custom providers. The core rule: **attempt ≠ completion** — only passing gates complete a checkpoint; failed gates produce structured findings, and unregistered gates fail closed.
 
+## Lifecycle Commands (spec section 151)
+
+```bash
+paw lifecycle show            # the effective flow: canonical phases + plugin stages [--json]
+paw lifecycle run             # run the flow in phase order (fail-closed on required phases)
+paw lifecycle status          # last flow run state [--json]
+```
+
+The canonical lifecycle phases (create, research, initialize, plan, develop, verify, release, distribute, operate) are owned by the kernel; stage plugins contribute additional phases (e.g. threat modeling after research). Execution modes per stage: `checkpoint-plan` (gates), `command` (shell), `research` (delegates to `paw research`), `manual` (run its commands, then continue). A required-phase failure stops the flow; state persists to `.paw/state/lifecycle-state.json`. See [Lifecycle](lifecycle.md).
+
 ## Research Commands (spec section 149)
 
 ```bash

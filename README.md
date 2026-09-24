@@ -5169,3 +5169,49 @@ paw checkpoint list | run | status
 ```
 
 Typed events: `checkpoint/started`, `checkpoint/gate-started`, `checkpoint/gate-completed`, `checkpoint/completed`, `checkpoint/failed` — every interface built on them is a projection (section 145 survives as a rule, not a product).
+
+# The canonical lifecycle (section 151)
+
+Verification is not a single final step; the workspace runs a programmable development lifecycle. The kernel owns the **canonical phases** — the fixed spine every workspace shares — while executors and plugins own the **phase work**. No provider business logic enters the kernel (section 139 still applies).
+
+## Canonical phases
+
+```
+create → research → initialize → plan → develop → verify → release → distribute → operate
+```
+
+A flow is an ordered list of stages, each bound to a phase with an execution mode:
+
+| Mode | Meaning |
+|------|---------|
+| `checkpoint-plan` | The phase's work is a checkpoint plan (section 150 gates) |
+| `command` | A shell command provided by the stage |
+| `research` | Delegates to `paw research` (section 149 product interview) |
+| `manual` | The phase needs a human/agent to run its commands, then continue |
+
+## Defaults and contribution
+
+`paw lifecycle show` prints the effective flow. The default flow ships with sensible commands (initialize runs `paw init`; verify binds the workspace checkpoint plan). Stage plugins contribute phases **declaratively** via the manifest:
+
+```yaml
+lifecycleStages:
+  - phase: custom
+    after: research
+    id: threat-model
+    title: Threat model the plan
+    execution: manual
+```
+
+Contributions insert after their anchor phase (or stage id); an unknown anchor is skipped silently — a plugin can never reorder or remove canonical phases. The bundled stage plugin `stage-threat-modeling` demonstrates the pattern.
+
+## Commands and events
+
+```bash
+paw lifecycle show | run | status
+```
+
+`run` executes stages in order, fail-closed: a required-phase failure stops the flow, skips are explicit with reasons, and outcomes persist to `.paw/state/lifecycle-state.json`. Typed events: `lifecycle/phase-started`, `lifecycle/phase-skipped`, `lifecycle/phase-completed`, `lifecycle/flow-completed` — every interface built on them is a projection.
+
+## Division of authority
+
+PAW owns the lifecycle, plugins own the capabilities, checkpoints own the work, gates own trust, evidence owns proof. Executors (agent harnesses) own how phase work gets done; the kernel only orchestrates phases and enforces policy (parallel, required, onFailure, maxRetries).

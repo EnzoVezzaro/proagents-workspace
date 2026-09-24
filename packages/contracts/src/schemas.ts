@@ -14,6 +14,35 @@ export const semverRangeSchema = z.string().regex(
 );
 
 /**
+ * The canonical lifecycle phases, in canonical order. These are vocabulary,
+ * not implementations — every phase's work comes from plugins. `custom`
+ * marks a plugin-contributed phase.
+ */
+export const lifecyclePhaseSchema = z.enum([
+  "create",
+  "research",
+  "initialize",
+  "plan",
+  "develop",
+  "verify",
+  "release",
+  "distribute",
+  "operate",
+  "custom",
+]);
+
+export type LifecyclePhase = z.infer<typeof lifecyclePhaseSchema>;
+
+/** How a phase executes. `checkpoint-plan` delegates to the gate model (§150). */
+export const phaseExecutionSchema = z.enum([
+  "checkpoint-plan",
+  "command",
+  "research",
+  "manual",
+]);
+
+
+/**
  * Permission categories a plugin may request. The kernel enforces these;
  * a plugin never self-grants (spec section 59).
  */
@@ -54,6 +83,32 @@ export const pluginManifestSchema = z.object({
   provider: z.string().min(1).optional(),
   /** Capability contracts this plugin implements, e.g. ["runtime", "filesystem"]. */
   capabilities: z.array(z.string().min(1)).min(1),
+  /**
+   * Plugin category (spec section 151): provider | executor | gate | stage.
+   * Advisory catalog metadata; capability resolution always goes through the
+   * registry, never through this field.
+   */
+  category: z.enum(["provider", "executor", "gate", "stage"]).optional(),
+  /**
+   * Lifecycle stage contributions (spec section 151 §12): a `stage` plugin
+   * may insert a NEW phase into the canonical flow. Contributions are DATA
+   * merged at composition time; the kernel stays the sole authority over
+   * ordering, transitions, and state.
+   */
+  lifecycleStages: z
+    .array(
+      z.object({
+        phase: lifecyclePhaseSchema,
+        /** Insert after this canonical phase id (e.g. "research"). */
+        after: z.string().min(1),
+        id: z.string().min(1),
+        title: z.string().min(1),
+        execution: phaseExecutionSchema.optional(),
+        command: z.string().optional(),
+        plan: z.string().optional(),
+      })
+    )
+    .optional(),
   /** Service or plugin ids this plugin requires to be present. */
   dependencies: z.array(z.string().min(1)).default([]),
   /** Permission requests — enforced by the kernel, never self-granted. */
@@ -206,6 +261,34 @@ export const developmentLifecycleSchema = z.object({
   name: z.string().min(1),
   description: z.string().optional(),
   stages: z.array(lifecycleStageSchema).min(1),
+});
+
+// ---------------------------------------------------------------------------
+// Canonical workspace lifecycle (spec section 151): the kernel owns PHASES,
+// transitions, and state; plugins own what happens INSIDE a phase. "The
+// lifecycle is opinionated; the implementation is extensible."
+// ---------------------------------------------------------------------------
+
+/** One stage of the canonical flow: a phase instance with declared execution. */
+export const lifecycleFlowStageSchema = z.object({
+  phase: lifecyclePhaseSchema,
+  /** Non-custom phases default to their canonical phase id. */
+  id: z.string().min(1).optional(),
+  title: z.string().min(1).optional(),
+  execution: phaseExecutionSchema.optional(),
+  /** For command execution. */
+  command: z.string().optional(),
+  /** Checkpoint plan path (checkpoint-plan execution), relative to root. */
+  plan: z.string().optional(),
+  /** Stage policy (same semantics as lifecycle stage policies). */
+  policy: lifecycleStagePolicySchema.prefault({}),
+});
+
+/** The composed flow a workspace actually runs (spec section 151). */
+export const lifecycleFlowSchema = z.object({
+  version: z.literal(1),
+  title: z.string().min(1),
+  stages: z.array(lifecycleFlowStageSchema).min(1),
 });
 
 // ---------------------------------------------------------------------------
@@ -479,6 +562,8 @@ export const workspaceConfigSchema = z.object({
     .optional(),
   plugins: z.array(pluginSelectionSchema).optional(),
   lifecycle: lifecycleConfigSchema.optional(),
+  /** Canonical lifecycle flow override (spec section 151). */
+  lifecycleFlow: lifecycleFlowSchema.optional(),
   /** Checkpoint plan binding (spec section 150): inline plan or a file path. */
   checkpoints: z
     .object({
@@ -520,3 +605,6 @@ export type GateEvidence = z.infer<typeof gateEvidenceSchema>;
 export type CheckpointStatus = z.infer<typeof checkpointStatusSchema>;
 export type Checkpoint = z.infer<typeof checkpointSchema>;
 export type CheckpointPlan = z.infer<typeof checkpointPlanSchema>;
+export type LifecycleFlow = z.infer<typeof lifecycleFlowSchema>;
+export type LifecycleFlowStage = z.infer<typeof lifecycleFlowStageSchema>;
+export type PhaseExecution = z.infer<typeof phaseExecutionSchema>;

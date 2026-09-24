@@ -289,3 +289,19 @@ workspaces:
 ```
 
 Resolution order: `lifecycle.inline` → `lifecycle.ref` → top-level `lifecycle.default`; an unknown ref is a structured `CONFIG_INVALID` error. Stage progress is emitted as `lifecycle/*` events on the typed bus.
+
+### The canonical lifecycle flow (spec section 151)
+
+Independent of per-workspace lifecycle definitions, a project may override the **canonical phase flow** that `paw lifecycle run` executes. Omitting it selects the default nine-phase flow (create → research → initialize → plan → develop → verify → release → distribute → operate):
+
+```yaml
+lifecycleFlow:
+  version: 1
+  title: Docs-first
+  stages:
+    - { phase: research, execution: research }
+    - { phase: plan, execution: checkpoint-plan }
+    - { phase: develop, execution: command, command: pnpm build }
+```
+
+Stage plugins contribute additional phases via their manifest `lifecycleStages` (see [Lifecycle](lifecycle.md)); contributions insert after their anchor and can never reorder or remove canonical phases. State persists to `.paw/state/lifecycle-state.json`.

@@ -23,6 +23,7 @@ import { behaviorGatePlugin } from "@proagents/plugin-gate-behavior";
 import { securityGatePlugin } from "@proagents/plugin-gate-security";
 import { humanGatePlugin } from "@proagents/plugin-gate-human";
 import { adversarialGatePlugin } from "@proagents/plugin-gate-adversarial";
+import { threatModelingStagePlugin } from "@proagents/plugin-stage-threat-modeling";
 
 export function bundledPlugins(): PluginDefinition[] {
   return [
@@ -39,5 +40,18 @@ export function bundledPlugins(): PluginDefinition[] {
     securityGatePlugin,
     humanGatePlugin,
     adversarialGatePlugin,
+    // Stage plugins (spec section 151): contribute lifecycle phases as DATA.
+    threatModelingStagePlugin,
   ];
+}
+
+/** Stage contributions from bundled stage plugins (spec section 151 §12). */
+export function bundledStageContributions(): readonly { phase: string; after: string; id: string; title: string }[] {
+  const out: { phase: string; after: string; id: string; title: string }[] = [];
+  for (const plugin of bundledPlugins()) {
+    for (const stage of plugin.manifest.lifecycleStages ?? []) {
+      out.push({ phase: stage.phase, after: stage.after, id: stage.id, title: stage.title });
+    }
+  }
+  return out;
 }

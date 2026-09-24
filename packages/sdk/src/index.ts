@@ -19,6 +19,11 @@ export {
   Workspace,
   CheckpointRunner,
   orderCheckpoints,
+  WorkspaceLifecycleRunner,
+  composeFlow,
+  defaultFlow,
+  spliceContributions,
+  CANONICAL_PHASES,
 } from "@proagents/kernel";
 export type {
   ApprovalFlow,

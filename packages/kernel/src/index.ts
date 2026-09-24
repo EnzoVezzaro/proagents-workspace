@@ -3,6 +3,7 @@ export * from "./event-bus.js";
 export * from "./health.js";
 export * from "./lifecycle.js";
 export * from "./lifecycle-runner.js";
+export * from "./lifecycle-flow.js";
 export * from "./checkpoint-runner.js";
 export * from "./logger.js";
 export * from "./permissions.js";

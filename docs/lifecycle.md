@@ -1,5 +1,36 @@
 # Development Lifecycle
 
+## The Canonical Workspace Lifecycle (spec section 151)
+
+The kernel owns one opinionated, canonical lifecycle — vocabulary, not implementations. Every phase's work comes from plugins:
+
+```text
+CREATE → RESEARCH → INITIALIZE → PLAN → DEVELOP → VERIFY → RELEASE → DISTRIBUTE → OPERATE
+```
+
+```bash
+paw lifecycle show      # the composed flow: order, phases, execution mode
+paw lifecycle run       # execute the flow (skips recorded honestly)
+paw lifecycle status    # persisted phase state (.paw/state/lifecycle-state.json)
+```
+
+The division of authority is normative: **PAW owns the lifecycle, plugins own the capabilities, checkpoints own the work, gates own trust, evidence owns proof.**
+
+- A phase with no registered executor is SKIPPED and reported — the flow never invents work.
+- A required phase failure stops the flow (fail-closed).
+- `develop`/`verify` phases delegate to checkpoint plans (see [Checkpoints and Gates](checkpoints.md)) — attempt ≠ completion.
+- Plugins may CONTRIBUTE new phases (`category: "stage"` + `lifecycleStages` in the manifest; e.g. the bundled threat-modeling stage inserts after `research`). Contributions are data merged at composition; canonical stages are never removed or reordered.
+- A workspace can override the flow entirely with `lifecycleFlow` in `.paw/workspace.yaml` (e.g. a tiny `initialize → develop → verify → release` for small projects).
+
+### Plugin categories (spec section 151 §13)
+
+| Category | Role | Examples |
+|----------|------|----------|
+| `provider` | supply capabilities | ACC, Repo Shield, Docker, GitHub |
+| `executor` | perform work | ProAgents, Claude, Codex, local agents |
+| `gate` | decide whether work can progress | behavior, security, adversarial, human |
+| `stage` | add lifecycle behavior | threat modeling, benchmarking, legal review |
+
 ## Core Concept: Programmable Lifecycle Steps
 
 The key change: **verification should not be a single final step**. The Workspace supports a programmable, extensible **development lifecycle loop** where additional validation stages can be inserted depending on the project, agent, risk level, or Workspace profile.

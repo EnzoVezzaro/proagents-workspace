@@ -77,6 +77,9 @@ importers:
       '@proagents/plugin-shell':
         specifier: workspace:*
         version: link:../../plugins/plugin-shell
+      '@proagents/plugin-stage-threat-modeling':
+        specifier: workspace:*
+        version: link:../../plugins/plugin-stage-threat-modeling
       '@proagents/workspace':
         specifier: workspace:*
         version: link:../sdk
@@ -337,6 +340,16 @@ importers:
       vitest:
         specifier: ^3.2.4
         version: 3.2.7(@types/node@22.20.4)(tsx@4.23.15)
+
+  plugins/plugin-stage-threat-modeling:
+    dependencies:
+      '@proagents/workspace':
+        specifier: workspace:*
+        version: link:../../packages/sdk
+    devDependencies:
+      typescript:
+        specifier: ^5.9.2
+        version: 5.9.3
 
 packages:
 

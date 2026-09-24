@@ -34,6 +34,7 @@
     "@proagents/plugin-gate-security": "workspace:*",
     "@proagents/plugin-gate-human": "workspace:*",
     "@proagents/plugin-gate-adversarial": "workspace:*",
+    "@proagents/plugin-stage-threat-modeling": "workspace:*",
     "zod": "^4.1.5"
   },
   "devDependencies": {

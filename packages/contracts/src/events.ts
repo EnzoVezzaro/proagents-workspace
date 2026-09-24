@@ -117,6 +117,12 @@ export interface WorkspaceEventMap {
   };
   "checkpoint/completed": { checkpointId: string; evidence: readonly { gateId: string; status: "passed" | "failed" | "skipped" }[] };
   "checkpoint/failed": { checkpointId: string; reason: string; gateId?: string };
+
+  // canonical lifecycle phases (spec section 151)
+  "lifecycle/phase-started": { phase: string; title: string; index: number; total: number };
+  "lifecycle/phase-skipped": { phase: string; reason: string };
+  "lifecycle/phase-completed": { phase: string; durationMs: number; summary?: string };
+  "lifecycle/flow-completed": { flow: string; passed: number; skipped: number };
 }
 
 export type WorkspaceEventName = keyof WorkspaceEventMap;
