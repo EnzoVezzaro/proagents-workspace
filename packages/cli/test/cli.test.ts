@@ -49,7 +49,7 @@ describe("paw CLI (e2e)", () => {
   it("help lists the convention-first command vocabulary", async () => {
     const r = await paw(["help"]);
     expect(r.code).toBe(0);
-    for (const command of ["init", "status", "doctor", "verify", "diff", "agent list", "desktop"]) {
+    for (const command of ["init", "status", "doctor", "verify", "diff", "agent list"]) {
       expect(r.stdout).toContain(command);
     }
   });
@@ -62,9 +62,9 @@ describe("paw CLI (e2e)", () => {
     expect(parsed.commands).toContain("verify");
   });
 
-  it("help states that no runtime/account/desktop is required", async () => {
+  it("help states that no runtime or account is required", async () => {
     const r = await paw(["help"]);
-    expect(r.stdout).toContain("No runtime, cloud account, or desktop application is required");
+    expect(r.stdout).toContain("No runtime or cloud account is required");
   });
 
   it("plugin list --json shows only config-referenced plugins", async () => {
@@ -104,7 +104,7 @@ describe("paw CLI (e2e)", () => {
 });
 
 describe("paw init golden path (e2e, spec 3/63/71)", () => {
-  it("init → status → verify works in a fresh fixture without git, agents, cloud, or desktop", async () => {
+  it("init → status → verify works in a fresh fixture without git, agents, or cloud", async () => {
     const root = await fixture({ test: "echo tested" });
 
     // 1. init — creates .paw/ metadata only.
@@ -157,12 +157,11 @@ describe("paw init golden path (e2e, spec 3/63/71)", () => {
     expect(r.stdout).toContain("Optional");
   });
 
-  it("desktop reports honestly that the UI is optional", async () => {
+  it("desktop is retired — the command no longer exists", async () => {
     const r = await paw(["desktop", "--json"]);
-    expect(r.code).toBe(0);
-    const parsed = JSON.parse(r.stdout) as { available: boolean; command: string };
-    expect(parsed.available).toBe(false);
-    expect(parsed.command).toBe("desktop");
+    expect(r.code).toBe(2);
+    const parsed = JSON.parse(r.stderr) as { code: string };
+    expect(parsed.code).toBe("COMMAND_NOT_FOUND");
   });
 });
 

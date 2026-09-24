@@ -8,12 +8,13 @@ project:
   description: >-
     The convention-first workspace for AI coding agents — a lightweight,
     local-first developer CLI around an existing repository (paw init /
-    status / research / verify), with isolated runtimes, lifecycle, and
-    desktop as progressive opt-ins. README.md is the canonical product spec
-    (sections 148–149 pin the product model and research convergence);
-    docs/ is the distilled documentation. V1 implementation (kernel, paw
-    CLI, SDK, bundled plugins, verification) has landed; the agent
-    environment spec sections 134/139 still govern kernel purity and scope.
+    status / research / verify), with isolated runtimes and lifecycle as
+    progressive opt-ins. There is no desktop application: the terminal is
+    the interface. README.md is the canonical product spec (sections
+    148–149 pin the product model and research convergence); docs/ is the
+    distilled documentation. V1 implementation (kernel, paw CLI, SDK,
+    bundled plugins, verification) has landed; the agent environment spec
+    sections 134/139 still govern kernel purity and scope.
 
 environment:
   # Professions this job needs — mirrors .acc/config/agents/ (the ACC expertise map):

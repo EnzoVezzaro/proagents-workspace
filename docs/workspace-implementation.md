@@ -3,9 +3,7 @@
 > Status: implemented in this repository (`packages/` + `plugins/`), versioned
 > as 0.1.0. This page describes the working TypeScript implementation of the
 > architecture in [Architecture](./architecture.md); the canonical product
-> specification remains `README.md`. The planned desktop UI above this kernel
-> is specified in [PROAGENTS-WORKSPACE-UI.md](../PROAGENTS-WORKSPACE-UI.md)
-> (spec section 145).
+> specification remains `README.md`.
 
 The Workspace ships as a **small kernel plus plugins**. The kernel contains no
 provider-specific logic — every runtime, repository, context, agent, and

@@ -191,5 +191,5 @@ Execution semantics:
 
 - Stages run in declaration order; `parallel: true` is **advisory** in this milestone (reported honestly, not hidden behind fake concurrency).
 - Stage execution is delegated to an injected `StageExecutor` — the kernel provides sequencing, policies, and events; it never spawns agents or runs tools itself (kernel purity, spec section 139).
-- Per-stage progress flows over the typed event bus: `lifecycle/stage-started`, `lifecycle/stage-completed`, `lifecycle/completed`. The UI Lifecycle Inspector (see `PROAGENTS-WORKSPACE-UI.md` section 51) is a pure projection over these events.
+- Per-stage progress flows over the typed event bus: `lifecycle/stage-started`, `lifecycle/stage-completed`, `lifecycle/completed` — any interface built on these events is a pure projection over them.
 - A lifecycle run resolves the workspace's entry (`lifecycle.inline` preferred, then `lifecycle.ref`, then the top-level `lifecycle.default`); an unknown ref is a structured `CONFIG_INVALID` error.

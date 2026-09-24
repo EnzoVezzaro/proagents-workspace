@@ -19,16 +19,14 @@ Owner: proagents-workspace maintainers
 
 ## Inputs
 
-- `README.md` — the canonical product specification (145 numbered sections).
+- `README.md` — the canonical product specification (149 numbered sections).
 - `DISTRIBUTION.md` — the protection & distribution architecture supplement.
-- `PROAGENTS-WORKSPACE-UI.md` — the desktop UI & product architecture supplement (spec section 145).
 - Community feedback, issues, and ecosystem requirements (ProAgents, ACC, Repo Shield, reposell).
 
 ## Outputs
 
 - `docs/` — the published documentation set (concepts, providers, security, CLI reference).
 - The `workspace.yaml` configuration schema (declarative workspace definition).
-- The desktop UI product architecture (`PROAGENTS-WORKSPACE-UI.md`).
 - The `paw` CLI command surface and the `@proagents/workspace` SDK contract.
 
 ## Dependencies

@@ -50,7 +50,7 @@ const FORBIDDEN = [
 /** The golden-path commands docs/cli-reference.md promises (spec sections 50/148). */
 const PROMISED_COMMANDS = [
   "init", "status", "research", "doctor", "verify", "diff",
-  "agent list", "config show", "desktop",
+  "agent list", "config show",
 ] as const;
 
 describe("docs ↔ code pact: the paw CLI is real", () => {

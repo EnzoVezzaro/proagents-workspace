@@ -9,7 +9,7 @@ npm install -g @reposell/proagents-workspace
 paw --version
 ```
 
-Requires Node.js 18+. No cloud account, API key, Docker, or desktop application is required.
+Requires Node.js 18+. No cloud account, API key, Docker, or desktop application — the terminal is the interface.
 
 ## The Golden Path
 
@@ -54,7 +54,6 @@ Created:
 
 No runtime required.
 No cloud account required.
-No desktop application required.
 ```
 
 `paw init` never overwrites project files, never rewrites `package.json`, and never changes Git state. Existing `AGENTS.md` and `.acc/` files stay owned by their existing owners.

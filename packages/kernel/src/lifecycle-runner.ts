@@ -4,7 +4,7 @@
  *
  * A lifecycle is a declarative list of stages (contracts `DevelopmentLifecycle`);
  * this runner walks them in order, emitting the typed `lifecycle/*` events so
- * the UI (Lifecycle Inspector, PROAGENTS-WORKSPACE-UI.md §51) stays a pure
+ * any interface built on these events stays a pure
  * projection over the kernel event bus — it holds no state of its own.
  *
  * WHAT A STAGE DOES: the runner is deliberately NOT an agent orchestrator —

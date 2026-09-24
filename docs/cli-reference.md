@@ -17,8 +17,9 @@ paw doctor        # diagnostics; optional components never appear as failures [-
 paw verify        # run detected/configured verification [--json]
 paw diff          # git working-tree diff
 paw agent list    # detected agents + honest integration tiers [--json]
-paw desktop       # optional UI — reports honestly that it is optional
 ```
+
+> The desktop application was **retired in v0.3.0** — there is no `paw desktop`. The product is the CLI + the developer's terminal (spec section 145).
 
 Simple commands do not boot plugins or runtimes; capability activation is lazy. `paw status` answers: where am I, what project is this, what branch, what agents are available, what verification is configured.
 

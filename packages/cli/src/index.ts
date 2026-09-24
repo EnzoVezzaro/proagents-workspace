@@ -339,14 +339,13 @@ function usage(): string {
     "  config show   Effective configuration and where each layer came from",
     "  plugin list   Registered plugins and their capabilities",
     "  service list  Registered capability services",
-    "  desktop       Open the optional control-room UI (never required)",
     "",
     "Isolated workspaces (optional, progressive):",
     "  paw workspace create [--runtime docker|e2b] [--repo <ref>]",
     "",
     "Global flags: --json (machine-readable), --headless (fail closed on approvals)",
     "",
-    "No runtime, cloud account, or desktop application is required.",
+    "No runtime or cloud account is required. The terminal is the interface.",
   ].join("\n");
 }
 
@@ -375,7 +374,7 @@ async function main(): Promise<number> {
           {
             commands: [
               "init", "status", "research", "doctor", "verify", "diff", "agent list", "config show",
-              "plugin list", "service list", "desktop", "workspace create",
+              "plugin list", "service list", "workspace create",
             ],
           },
           null,
@@ -418,7 +417,7 @@ async function main(): Promise<number> {
         process.stdout.write("\nProAgents Workspace initialized.\n");
         process.stdout.write("\nCreated:\n");
         for (const file of result.created) process.stdout.write(`  ${file}\n`);
-        process.stdout.write("\nNo runtime required.\nNo cloud account required.\nNo desktop application required.\n");
+        process.stdout.write("\nNo runtime required.\nNo cloud account required.\n");
         process.stdout.write("\nRun:\n  paw doctor\n  paw verify\n");
         const agents = detectedAgents(await discoverEnvironment(projectRoot));
         if (agents.length > 0) {
@@ -652,22 +651,6 @@ async function main(): Promise<number> {
         } finally {
           await client.stop();
         }
-      }
-
-      case "desktop":
-      case "open": {
-        // The desktop application is a projection over the Workspace API —
-        // optional by definition (spec sections 4/28). It is not installed
-        // with the core CLI; report honestly instead of failing silently.
-        const payload = {
-          command: "desktop",
-          available: false,
-          message: "The control-room UI (@proagents/ui) is an optional projection over the Workspace API and is not part of the core CLI install.",
-          suggestion: "Run `pnpm ui` in a checkout of proagents-workspace, or use `paw status` / `paw verify` in the terminal.",
-        };
-        if (parsed.json) process.stdout.write(`${JSON.stringify(payload, null, 2)}\n`);
-        else process.stdout.write(`${payload.message}\n${payload.suggestion}\n`);
-        return 0;
       }
 
       case "workspace": {

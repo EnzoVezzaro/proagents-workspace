@@ -17,9 +17,6 @@ Owner: proagents-workspace maintainers
   (review surface, ACC014): plugins build on the SDK, the CLI ships the
   catalog. Kernel-purity limits that cycle to a single leaf consumer, so
   packages/cli is the only package that ever imports a plugin.
-- The control-room UI (`app/`) is a leaf consumer like the CLI: it imports
-  the kernel and plugins directly and never the other way around; this
-  packages edge is declared here (ACC022 review surface).
 
 ## Layout
 
@@ -29,7 +26,6 @@ Owner: proagents-workspace maintainers
 | `packages/kernel` | `@proagents/kernel` | Event bus, service + capability registries, plugin discovery/dependency resolution, lifecycle state machine, permission framework, command registry, health aggregation, structured logging. **No provider-specific logic.** |
 | `packages/sdk` | `@proagents/workspace` | The authoring surface: `definePlugin`, `WorkspaceClient`. Re-exports contracts + kernel. Everything plugins depend on. |
 | `packages/cli` | `proagents-workspace` (binary `paw`) | Thin CLI over the SDK: `doctor`, `plugin list`, `service list`, `config show`, `verify`. `--json` everywhere, `--headless` fails closed. |
-| `app/` | `@proagents/ui` | Control-room server + single-page UI (PROAGENTS-WORKSPACE-UI.md MVP). Boots the real kernel via the SDK with the bundled plugin catalog; a projection over kernel events/session logs (spec §145) — no enforcement logic of its own. |
 
 ## Invariants (kernel purity, spec section 139)
 

@@ -211,7 +211,7 @@ export interface ResearchResult {
  * repository → environment, build the research model, derive the remaining
  * questions, and write the artifacts. The interview loop is separate
  * (`answerQuestion` + re-render) so hosts can drive it interactively,
- * headlessly, or through the desktop — same model either way.
+ * headlessly, or through any future interface — same model either way.
  */
 export async function runResearch(projectRoot: string, options: ResearchOptions = {}): Promise<ResearchResult> {
   const project = await detectProject(projectRoot);

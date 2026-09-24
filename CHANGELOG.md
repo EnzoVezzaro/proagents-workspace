@@ -7,6 +7,20 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 The repository is specification-first: until the first implementation release,
 the project stays on 0.x and everything may change.
 
+## [0.3.0] - 2026-09-24
+
+The desktop application is retired. ProAgents Workspace is a **clean workstation for AI coding agents**: `paw` prepares, verifies, and observes the workspace; the coding agent (Codex, Claude Code, OpenCode, Gemini CLI, DeepSeek Harness, Freebuff, …) works in that environment through its own interface — the terminal.
+
+### Removed
+
+- **The control-room desktop application** (`app/`, `@proagents/ui`, `paw-ui`, the `paw desktop` command) and its product supplement (`PROAGENTS-WORKSPACE-UI.md`, spec section 145). Rationale (spec section 148): a desktop shell duplicated what the agent and the terminal already provide; the kernel, contracts, and CLI are the entire product surface. Also removed with it: the `node-pty` dependency and `pnpm ui` script at the root, the `scripts/live-verify-isolation.sh` harness (it drove the app server), and the `@proagents/ui` workspace entry. Spec section 145 is a TOMBSTONE — the number is retired, not renumbered; its surviving normative rules (interfaces are projections over kernel events, adapter surfaces report capabilities honestly) are restated in the section and still bind any future interface work.
+
+### Changed
+
+- All workspace packages bumped 0.2.0 → 0.3.0.
+- `paw help` no longer lists `desktop`; `paw desktop` now returns the structured `COMMAND_NOT_FOUND` error (pinned by a test).
+- Test suite reduced from 322 to 251 tests: the removed app's 71 integration tests (server, chats, wizard, terminal, editor, browser) left with the application; no product-level test was weakened.
+
 ## [Unreleased]
 
 ### Added
@@ -132,5 +146,6 @@ yet — `packages/` and `plugins/` land in subsequent releases per the V1 scope
 - Broken documentation index links: `verification.md` and `cli-reference.md`
   were referenced from `index.md` but did not exist.
 
+[0.3.0]: https://github.com/EnzoVezzaro/proagents-workspace/releases/tag/v0.3.0
 [0.2.0]: https://github.com/EnzoVezzaro/proagents-workspace/releases/tag/v0.2.0
 [0.1.0]: https://github.com/EnzoVezzaro/proagents-workspace/releases/tag/v0.1.0

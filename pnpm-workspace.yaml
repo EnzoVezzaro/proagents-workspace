@@ -1,7 +1,6 @@
 packages:
   - "packages/*"
   - "plugins/*"
-  - "app"
   - "."
 
 # esbuild needs its postinstall to install the platform binary (vitest dependency)

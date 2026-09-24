@@ -18,7 +18,7 @@ paw verify      # runs detected lint/typecheck/test/build — no configuration n
 codex           # your existing agent keeps working
 ```
 
-No runtime required. No cloud account required. No desktop application required. No Docker, E2B, GitHub, ACC, ProAgents, or MCP required.
+No runtime required. No cloud account required. No Docker, E2B, GitHub, ACC, ProAgents, or MCP required.
 
 It is designed to work with:
 
@@ -46,10 +46,11 @@ Level 3  Verification          paw verify     inferred from project scripts
 Level 4  Context               ACC etc.       optional context providers
 Level 5  Lifecycle             paw lifecycle  programmable, inferred by default
 Level 6  Isolation             paw workspace create --runtime docker|e2b
-Level 7  Desktop               paw desktop    optional projection UI
 ```
 
-Everything below Level 3 is OPTIONAL and invisible until it provides value. The default experience operates directly on the developer's current repository — the project is never cloned or moved. Isolated runtimes are a separate, explicit mode (spec section 148: "Workspace" = the developer/project environment by default; "isolated/runtime workspace" = the heavier sandboxed mode).
+(Level 7, the desktop application, was retired in v0.3.0 — see spec section 145.)
+
+Everything below Level 3 is OPTIONAL and invisible until it provides value. The default experience operates directly on the developer's current repository — the project is never cloned or moved. Isolated runtimes are a separate, explicit mode (spec section 148: "Workspace" = the developer/project environment by default; "isolated/runtime workspace" = the heavier sandboxed mode). There is no desktop application: the terminal is the interface.
 
 ---
 
@@ -4861,18 +4862,13 @@ Kernel purity (section 139) applies unchanged: adapters are plugins, the kernel 
 
 ---
 
-# 145. Desktop UI — Product Specification Pointer
+# 145. Desktop UI — Retired
 
-The Workspace's desktop application (shell, layout, agent runtimes, terminals, trajectory, cross-harness view) is specified in **`PROAGENTS-WORKSPACE-UI.md`** — the canonical UI product specification, structured like `DISTRIBUTION.md` as a supplement to this document.
+The desktop application was RETIRED in v0.3.0 and its supplement (`PROAGENTS-WORKSPACE-UI.md`) removed. The product is the **CLI + the developer's terminal**: `paw` prepares, verifies, and observes the workspace; the coding agent (Codex, Claude Code, OpenCode, Gemini CLI, DeepSeek Harness, Freebuff, …) works in that environment through its own interface.
 
-Normative points that bind the UI to this spec:
+Rationale (product model, section 148): the Workspace is a clean workstation for AI coding agents — not an application platform. A desktop shell duplicated what the agent and terminal already provide, and its removal keeps the kernel, contracts, and CLI the entire surface.
 
-- The UI is a **projection** over kernel events and the session log (sections 143, 26–27 of the UI spec). React/UI state is never the source of truth.
-- Every visible runtime maps to a real `AgentRuntime` built on the kernel's contracts — `HarnessProvider` (section 144), workspace isolation (section 141), and sandbox policy (section 142) apply unchanged under the UI.
-- The UI adapts to `HarnessProvider` **capabilities** (native vs process tier, enforcement blocking vs advisory) and reports that tier honestly — no adapter surface appears in the UI that the underlying harness cannot actually provide.
-- Terminal ownership, agent attribution of file changes, and approvals surface the kernel's permission and protection events (sections 101–102) — the UI informs, the kernel enforces.
-
-The UI spec's engineering decisions (component tree, state models, Tauri process architecture) may evolve without changing this document; this section pins only the boundary that keeps the UI honest.
+The section number is RETIRED, not renumbered (spec section numbers are stable identifiers). Two boundary rules survive it and remain normative for any future interface work: every interface is a PROJECTION over kernel events and the session log — never the source of truth — and any adapter surface must reflect real `HarnessProvider` capabilities, reported honestly (sections 101–102, 141–144).
 
 ---
 
@@ -4971,14 +4967,14 @@ paw verify
 codex        # or claude, opencode, gemini, dsh — the developer's agent is never replaced
 ```
 
-This must work without Docker, E2B, GitHub, ACC, ProAgents, MCP, a desktop application, a cloud account, or an API key. A local Git repository is already a valid Workspace.
+This must work without Docker, E2B, GitHub, ACC, ProAgents, MCP, a cloud account, or an API key. A local Git repository is already a valid Workspace. There is no desktop application — the terminal is the interface.
 
 ## Terminology (normative)
 
 - **Workspace** (default) — the developer's project environment. `paw` operates on the CURRENT repository; the project is never cloned, moved, or rewritten.
 - **Isolated workspace / runtime workspace** — the heavier sandboxed mode created explicitly with `paw workspace create --runtime docker|e2b|…`. Used for automation, CI, untrusted or parallel agents.
 
-The two concepts must not be conflated in product language. The desktop application is an optional projection over the Workspace API — never required, never the source of truth.
+The two concepts must not be conflated in product language. There is no desktop application; the CLI and the developer's terminal are the only product interface.
 
 ## Progressive levels
 
@@ -4990,8 +4986,9 @@ Level 3  Verification          paw verify     inferred from project scripts
 Level 4  Context               ACC etc.       optional context providers (plugins)
 Level 5  Lifecycle             programmable; default inferred, never forced
 Level 6  Isolation             paw workspace create --runtime …  (opt-in)
-Level 7  Desktop               paw desktop    optional projection UI
 ```
+
+(Level 7, the desktop application, was retired in v0.3.0 — see spec section 145.)
 
 ## Conventions (what `paw init` creates)
 
