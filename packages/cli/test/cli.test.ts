@@ -247,4 +247,65 @@ describe("paw errors (e2e)", () => {
     const parsed = JSON.parse(r.stderr) as { code: string };
     expect(parsed.code).toBe("PROJECT_NOT_INITIALIZED");
   });
+
+  it("checkpoint list and run execute the plan through gates (spec 150)", async () => {
+    const root = await fixture({ test: "echo ok" });
+    await paw(["init"], { cwd: root });
+    const plan = {
+      version: 1,
+      title: "Ship the widget",
+      checkpoints: [
+        {
+          id: "CP-001",
+          title: "Widget logic works",
+          gates: [
+            { id: "tests", kind: "behavior", config: { command: "npm test" } },
+            { id: "review", kind: "human" },
+          ],
+          acceptanceCriteria: [{ id: "ac1", description: "build passes", command: "echo built" }],
+        },
+        {
+          id: "CP-002",
+          title: "Second checkpoint",
+          dependencies: ["CP-001"],
+          gates: [{ id: "tests", kind: "behavior", config: { command: "exit 1" } }],
+        },
+      ],
+    };
+    await writeFile(path.join(root, ".paw", "checkpoints.json"), JSON.stringify(plan), "utf8");
+
+    const list = await paw(["checkpoint", "list"], { cwd: root });
+    expect(list.code).toBe(0);
+    expect(list.stdout).toContain("CP-001");
+    expect(list.stdout).toContain("after CP-001");
+
+    // CP-001 passes (behavior gate + autonomous-free human gate is blocking:
+    // guarded mode prompts → stdin EOF denies). Run only CP-001 with an
+    // answering 'y' is not possible non-interactively, so expect honest
+    // failure reporting for CP-002's failing gate via --checkpoint + headless
+    // denial semantics for the human gate is covered in unit tests. Here:
+    const run1 = await paw(["checkpoint", "run", "--checkpoint", "CP-001", "--json", "--headless"], { cwd: root });
+    expect(run1.code).toBe(1); // headless human gate fails closed
+    const parsed = JSON.parse(run1.stdout) as { results: { checkpointId: string; status: string; evidence: { gateId: string; status: string; note?: string }[] }[] };
+    const cp1 = parsed.results[0]!;
+    expect(cp1.checkpointId).toBe("CP-001");
+    expect(cp1.evidence.find((e) => e.gateId === "tests")?.status).toBe("passed");
+    expect(cp1.evidence.find((e) => e.gateId === "review")?.status).toBe("failed");
+  });
+
+  it("checkpoint run reports a failing behavior gate with findings", async () => {
+    const root = await fixture();
+    await paw(["init"], { cwd: root });
+    const plan = {
+      version: 1,
+      title: "Failing plan",
+      checkpoints: [{ id: "CP-001", title: "will fail", gates: [{ id: "always", kind: "behavior", config: { command: "exit 3" }, policy: { blocking: true, maxRetries: 0 } }] }],
+    };
+    await writeFile(path.join(root, ".paw", "checkpoints.json"), JSON.stringify(plan), "utf8");
+    const r = await paw(["checkpoint", "run", "--json"], { cwd: root });
+    expect(r.code).toBe(1);
+    const parsed = JSON.parse(r.stdout) as { ok: boolean; results: { status: string; failedGateId?: string }[] };
+    expect(parsed.ok).toBe(false);
+    expect(parsed.results[0]!.failedGateId).toBe("always");
+  });
 });

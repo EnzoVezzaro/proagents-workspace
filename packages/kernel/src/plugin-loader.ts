@@ -224,6 +224,16 @@ export class PluginLoader {
     if ((config.context?.providers ?? []).some((p) => p === manifest.id || p === provider)) return true;
     if (config.protection?.provider === manifest.id || config.protection?.provider === provider) return true;
     if (config.distribution?.provider === manifest.id || config.distribution?.provider === provider) return true;
+    // Checkpoint plans reference gates by kind/provider (spec section 150):
+    // a gate plugin activates when the config binds a plan (inline or path),
+    // or when a checkpoint references its provider/kind explicitly. The
+    // kernel still resolves implementations through the registry at run time.
+    const gateWanted = new Set<string>();
+    const plan = config.checkpoints?.inline;
+    if (plan !== undefined) {
+      for (const c of plan.checkpoints) for (const g of c.gates) gateWanted.add(g.provider ?? g.kind);
+    }
+    if (gateWanted.has(manifest.provider ?? manifest.id)) return true;
     // Tools select capability plugins: e.g. tools: [shell, filesystem].
     // Tools match CAPABILITY ids, not provider vocabulary — the config's
     // `tools: [git]` is a capability hint, and the git plugin declares

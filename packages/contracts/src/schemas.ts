@@ -208,6 +208,122 @@ export const developmentLifecycleSchema = z.object({
   stages: z.array(lifecycleStageSchema).min(1),
 });
 
+// ---------------------------------------------------------------------------
+// Checkpoints + Gates (spec section 150, Helix-inspired): small ordered,
+// dependency-aware units of work whose completion is PROVEN by gates before
+// the work can progress. Core rule: ATTEMPT ≠ COMPLETION.
+// ---------------------------------------------------------------------------
+
+/** Coarse gate classes the runner understands natively (execution is plugin work). */
+export const gateKindSchema = z.enum([
+  "behavior",
+  "visual",
+  "adversarial",
+  "human",
+  "security",
+  "performance",
+  "accessibility",
+  "contract",
+  "custom",
+]);
+
+/** The verdict a gate produces. A gate never returns "attempted" — evidence or nothing. */
+export const gateStatusSchema = z.enum(["passed", "failed", "skipped"]);
+
+/** A structured finding produced by a gate (adversarial review, visual diff, human feedback). */
+export const gateFindingSchema = z.object({
+  severity: z.enum(["blocker", "major", "minor", "note"]),
+  /** Where the finding applies: a file, a screen, a component, a rule id. */
+  location: z.string().min(1),
+  issue: z.string().min(1),
+  suggestion: z.string().optional(),
+});
+
+/** Gate execution policy. */
+export const gatePolicySchema = z.object({
+  /** A blocker finding or failed gate blocks checkpoint completion. */
+  blocking: z.boolean().default(true),
+  /** Retry budget when the gate fails (adversarial loops, flaky checks). */
+  maxRetries: z.number().int().min(0).max(10).default(1),
+  /** Wall-clock budget in milliseconds. */
+  timeoutMs: z.number().int().min(1000).optional(),
+});
+
+/** A declared gate reference inside a checkpoint (resolved to a plugin). */
+export const gateRefSchema = z.object({
+  id: z.string().min(1),
+  kind: gateKindSchema,
+  /** The gate provider plugin to resolve (default: the kind name). */
+  provider: z.string().min(1).optional(),
+  /** Free-form gate configuration (visual reference, human approver, command). */
+  config: z.record(z.string(), z.unknown()).optional(),
+  policy: gatePolicySchema.prefault({}),
+});
+
+/** How a checkpoint completion criterion is verified, in one line. */
+export const acceptanceCriterionSchema = z.object({
+  id: z.string().min(1),
+  description: z.string().min(1),
+  /** Optional command producing evidence (exit 0 = satisfied). */
+  command: z.string().optional(),
+});
+
+/** Proof a gate produced: verdict, findings, duration, provenance. */
+export const gateEvidenceSchema = z.object({
+  gateId: z.string().min(1),
+  gateKind: gateKindSchema,
+  status: gateStatusSchema,
+  findings: z.array(gateFindingSchema).default([]),
+  durationMs: z.number().int().min(0),
+  at: z.string().min(1),
+  /** Honest enforcement note (e.g. human gate advisory in autonomous mode). */
+  note: z.string().optional(),
+});
+
+/** Checkpoint status machine: attempt ≠ completion — only gates complete a checkpoint. */
+export const checkpointStatusSchema = z.enum([
+  "planned",
+  "ready",
+  "running",
+  "awaiting-approval",
+  "blocked",
+  "failed",
+  "passed",
+]);
+
+/** One checkpoint: a small, independently verifiable unit of work. */
+export const checkpointSchema = z.object({
+  id: z.string().min(1).regex(/^CP-\d{3,}$/, "checkpoint id must be CP-### (zero-padded)"),
+  title: z.string().min(1),
+  description: z.string().optional(),
+  /** Checkpoint ids this one depends on (DAG). Empty = ready immediately. */
+  dependencies: z.array(z.string().regex(/^CP-\d{3,}$/)).default([]),
+  /** Scope limits what the checkpoint may touch (enforced via filesystem scope). */
+  scope: z
+    .object({
+      files: z.array(z.string()).default([]),
+      features: z.array(z.string()).default([]),
+      contracts: z.array(z.string()).default([]),
+    })
+    .optional(),
+  acceptanceCriteria: z.array(acceptanceCriterionSchema).default([]),
+  gates: z.array(gateRefSchema).min(1),
+  /** Visual/prototype reference for visual gates (spec section 150, §10). */
+  visualReference: z
+    .object({
+      type: z.enum(["prototype", "design", "screenshot"]),
+      path: z.string().min(1),
+    })
+    .optional(),
+});
+
+/** A full checkpoint plan: the ordered DAG for one body of work. */
+export const checkpointPlanSchema = z.object({
+  version: z.literal(1),
+  title: z.string().min(1),
+  checkpoints: z.array(checkpointSchema).min(1),
+});
+
 /** Lifecycle library + the default a workspace uses (spec sections 6/16). */
 export const lifecycleConfigSchema = z.object({
   /** Named lifecycles reusable across chats/workspaces. */
@@ -363,6 +479,15 @@ export const workspaceConfigSchema = z.object({
     .optional(),
   plugins: z.array(pluginSelectionSchema).optional(),
   lifecycle: lifecycleConfigSchema.optional(),
+  /** Checkpoint plan binding (spec section 150): inline plan or a file path. */
+  checkpoints: z
+    .object({
+      /** Inline plan (rare — plans usually live beside the code). */
+      inline: checkpointPlanSchema.optional(),
+      /** Path to a checkpoint plan file, relative to the project root. */
+      plan: z.string().min(1).optional(),
+    })
+    .optional(),
   workspaces: z
     .record(
       z.string().regex(/^[a-z][a-z0-9-]*$/, "workspace name must be kebab-case"),
@@ -385,3 +510,13 @@ export type LifecycleStageAgent = z.infer<typeof lifecycleStageSchema>["agents"]
 export type LifecycleStage = z.infer<typeof lifecycleStageSchema>;
 export type DevelopmentLifecycle = z.infer<typeof developmentLifecycleSchema>;
 export type LifecycleConfig = z.infer<typeof lifecycleConfigSchema>;
+export type GateKind = z.infer<typeof gateKindSchema>;
+export type GateStatus = z.infer<typeof gateStatusSchema>;
+export type GateFinding = z.infer<typeof gateFindingSchema>;
+export type GatePolicy = z.infer<typeof gatePolicySchema>;
+export type GateRef = z.infer<typeof gateRefSchema>;
+export type AcceptanceCriterion = z.infer<typeof acceptanceCriterionSchema>;
+export type GateEvidence = z.infer<typeof gateEvidenceSchema>;
+export type CheckpointStatus = z.infer<typeof checkpointStatusSchema>;
+export type Checkpoint = z.infer<typeof checkpointSchema>;
+export type CheckpointPlan = z.infer<typeof checkpointPlanSchema>;

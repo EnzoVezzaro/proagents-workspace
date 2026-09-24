@@ -30,6 +30,10 @@
     "@proagents/plugin-context-acc": "workspace:*",
     "@proagents/plugin-agent-codex": "workspace:*",
     "@proagents/plugin-repo-shield": "workspace:*",
+    "@proagents/plugin-gate-behavior": "workspace:*",
+    "@proagents/plugin-gate-security": "workspace:*",
+    "@proagents/plugin-gate-human": "workspace:*",
+    "@proagents/plugin-gate-adversarial": "workspace:*",
     "zod": "^4.1.5"
   },
   "devDependencies": {

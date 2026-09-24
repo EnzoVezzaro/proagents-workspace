@@ -103,6 +103,20 @@ export interface WorkspaceEventMap {
 
   // protection (Repo Shield layer)
   "protection/intervened": { operation: string; target: string; action: "allowed" | "blocked" | "requires-approval" };
+
+  // checkpoints + gates (spec section 150, Helix-inspired)
+  "checkpoint/started": { checkpointId: string; title: string };
+  "checkpoint/gate-started": { checkpointId: string; gateId: string; gateKind: string };
+  "checkpoint/gate-completed": {
+    checkpointId: string;
+    gateId: string;
+    gateKind: string;
+    status: "passed" | "failed" | "skipped";
+    findings: readonly { severity: "blocker" | "major" | "minor" | "note"; location: string; issue: string; suggestion?: string }[];
+    durationMs: number;
+  };
+  "checkpoint/completed": { checkpointId: string; evidence: readonly { gateId: string; status: "passed" | "failed" | "skipped" }[] };
+  "checkpoint/failed": { checkpointId: string; reason: string; gateId?: string };
 }
 
 export type WorkspaceEventName = keyof WorkspaceEventMap;

@@ -1,0 +1,23 @@
+{
+  "name": "@proagents/plugin-gate-human",
+  "version": "0.3.0",
+  "description": "human gate plugin for ProAgents Workspace checkpoints (spec section 150)",
+  "license": "MIT",
+  "type": "module",
+  "engines": { "node": ">=18" },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src",
+    "test": "vitest run",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@proagents/workspace": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.2"
+  }
+}

@@ -10,6 +10,7 @@
 import type { ProviderHealth } from "./health.js";
 import type { WorkspaceEventName } from "./events.js";
 import type { ApprovalMode, NetworkMode } from "./schemas.js";
+import type { Checkpoint, GateRef, GateEvidence, GateFinding, GateStatus } from "./schemas.js";
 
 /** Every provider implements a minimal common surface. */
 export interface ProviderBase {
@@ -438,6 +439,38 @@ export interface LifecycleProvider extends ProviderBase {
 }
 
 // ---------------------------------------------------------------------------
+// Gate (spec section 150, Helix-inspired): providers that PROVE a checkpoint's
+// work before it can progress. Gates are plugins resolved through the registry
+// — the kernel never hard-codes behavior/visual/adversarial/human logic.
+// The core product rule they enforce: ATTEMPT ≠ COMPLETION.
+// ---------------------------------------------------------------------------
+
+export interface GateContext {
+  /** The checkpoint under evaluation. */
+  readonly checkpoint: Checkpoint;
+  /** The specific gate declaration being executed. */
+  readonly gate: GateRef;
+  /** Project root the checkpoint runs against. */
+  readonly projectRoot: string;
+  /** Prior evidence from this checkpoint's earlier attempts (retry loops). */
+  readonly priorEvidence: readonly GateEvidence[];
+}
+
+export interface GateResult {
+  readonly gateId: string;
+  readonly status: GateStatus;
+  readonly findings: readonly GateFinding[];
+  readonly durationMs: number;
+  /** Honest enforcement note (e.g. "human gate advisory in autonomous mode"). */
+  readonly note?: string;
+}
+
+export interface GateProvider extends ProviderBase {
+  /** Evaluate the gate for the checkpoint. Must produce evidence, never vibes. */
+  evaluate(context: GateContext): Promise<GateResult>;
+}
+
+// ---------------------------------------------------------------------------
 // Distribution (reposell layer — cross-cutting)
 // ---------------------------------------------------------------------------
 
@@ -469,6 +502,7 @@ export const CAPABILITIES = [
   "protection",
   "distribution",
   "lifecycle",
+  "gate",
 ] as const;
 
 export type CapabilityId = (typeof CAPABILITIES)[number];

@@ -17,6 +17,8 @@ export {
   ServiceRegistry,
   StructuredLogger,
   Workspace,
+  CheckpointRunner,
+  orderCheckpoints,
 } from "@proagents/kernel";
 export type {
   ApprovalFlow,

@@ -5107,3 +5107,65 @@ Every fact records provenance (`context-provider`, `repository`, `environment`, 
 ## Boundary with the kernel
 
 Research is a PRODUCT capability in the SDK/CLI layer, not a kernel or provider concern (kernel purity, section 139): the SDK consumes the existing `ContextProvider` contract through supplied providers and never imports concrete plugins (dependency direction, section 50). Context providers participate during research exactly as they do at runtime — as plugins.
+
+---
+
+# 150. Checkpoints and Gates — the Convergence Architecture
+
+The Workspace's execution model is a **checkpoint + gate loop** (Helix-inspired; the convergence pattern is the point, not any vendor's agent roster):
+
+> **Small work → isolated context → objective evidence → hard gate → feedback → retry → proven checkpoint → next checkpoint.**
+
+The core rule is normative and holds at every level:
+
+> **ATTEMPT ≠ COMPLETION. An agent saying "finished" is an attempt; only GATES complete a checkpoint.**
+
+## The five primitives
+
+```text
+Research      discovers what should be built (section 149)
+Context       ACC / providers establish what is known
+Checkpoints   define small independently verifiable units of work
+Gates         prevent unproven work from progressing
+Lifecycle     Initialize → Develop → Validate → Release → Distribute
+```
+
+ProAgents provides the agents; the Workspace provides the lifecycle in which those agents converge on a validated result. RepoSell receives a validated release artifact — never an arbitrary repository.
+
+## Checkpoints
+
+A checkpoint is a small, ordered, dependency-aware unit of work (a DAG — parallel checkpoints and later merges are first-class): id (`CP-###`), title, scope, acceptance criteria, gates, and an optional visual reference (prototype/design/screenshot — the agent is never left guessing what the UI should look like).
+
+Status machine: `planned → ready → running → (awaiting-approval) → passed | failed | blocked`. Plans load from `.paw/checkpoints.json` (convention) or `checkpoints.plan` in the workspace configuration. A failed checkpoint stops the plan (fail-closed): subsequent work would rest on unproven ground.
+
+## Gates are plugins
+
+Gates are resolved through the registry against the `gate` capability — the kernel NEVER hard-codes gate kinds and NEVER branches on `kind` (sections 139/146). Bundled providers:
+
+```text
+behavior      proves behavior by executing a command (exit 0 = passed)
+visual        visual verification against a declared reference (provider-pluggable)
+adversarial   fresh-context reviewer agent; passes only on ZERO unresolved blockers
+human         product-authority approval; honest advisory reporting in autonomous mode
+security      Repo Shield's protection evaluation INSIDE the checkpoint loop (fails closed without a provider)
+```
+
+A checkpoint declares its own gate set — logic-only work needs no visual gate, UI work may skip performance. Every gate produces EVIDENCE (status, findings, duration, provenance) or nothing; a gate that crashes cannot pass a checkpoint. Human feedback that rejects a checkpoint is a finding the host converts into learnings and a follow-up checkpoint.
+
+## Context isolation per checkpoint
+
+The reviewer/agent context for a checkpoint is NOT the whole repository or the implementer's conversation:
+
+```text
+Agent Context = checkpoint + relevant ACC context + relevant files
+              + dependencies + acceptance criteria
+              + previous checkpoint evidence + applicable ProAgent instructions
+```
+
+## Commands and events
+
+```bash
+paw checkpoint list | run | status
+```
+
+Typed events: `checkpoint/started`, `checkpoint/gate-started`, `checkpoint/gate-completed`, `checkpoint/completed`, `checkpoint/failed` — every interface built on them is a projection (section 145 survives as a rule, not a product).

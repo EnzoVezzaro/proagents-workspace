@@ -50,6 +50,18 @@ importers:
       '@proagents/plugin-filesystem':
         specifier: workspace:*
         version: link:../../plugins/plugin-filesystem
+      '@proagents/plugin-gate-adversarial':
+        specifier: workspace:*
+        version: link:../../plugins/plugin-gate-adversarial
+      '@proagents/plugin-gate-behavior':
+        specifier: workspace:*
+        version: link:../../plugins/plugin-gate-behavior
+      '@proagents/plugin-gate-human':
+        specifier: workspace:*
+        version: link:../../plugins/plugin-gate-human
+      '@proagents/plugin-gate-security':
+        specifier: workspace:*
+        version: link:../../plugins/plugin-gate-security
       '@proagents/plugin-git':
         specifier: workspace:*
         version: link:../../plugins/plugin-git
@@ -194,6 +206,46 @@ importers:
       vitest:
         specifier: ^3.2.4
         version: 3.2.7(@types/node@22.20.4)(tsx@4.23.15)
+
+  plugins/plugin-gate-adversarial:
+    dependencies:
+      '@proagents/workspace':
+        specifier: workspace:*
+        version: link:../../packages/sdk
+    devDependencies:
+      typescript:
+        specifier: ^5.9.2
+        version: 5.9.3
+
+  plugins/plugin-gate-behavior:
+    dependencies:
+      '@proagents/workspace':
+        specifier: workspace:*
+        version: link:../../packages/sdk
+    devDependencies:
+      typescript:
+        specifier: ^5.9.2
+        version: 5.9.3
+
+  plugins/plugin-gate-human:
+    dependencies:
+      '@proagents/workspace':
+        specifier: workspace:*
+        version: link:../../packages/sdk
+    devDependencies:
+      typescript:
+        specifier: ^5.9.2
+        version: 5.9.3
+
+  plugins/plugin-gate-security:
+    dependencies:
+      '@proagents/workspace':
+        specifier: workspace:*
+        version: link:../../packages/sdk
+    devDependencies:
+      typescript:
+        specifier: ^5.9.2
+        version: 5.9.3
 
   plugins/plugin-git:
     dependencies:

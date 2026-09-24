@@ -336,6 +336,7 @@ function usage(): string {
     "  verify        Run detected/configured verification (lint, test, build)",
     "  diff          Git working-tree diff (requires git)",
     "  agent list    Detected coding agents and their integration tier",
+    "  checkpoint    List/run checkpoint plans with quality gates (spec 150)",
     "  config show   Effective configuration and where each layer came from",
     "  plugin list   Registered plugins and their capabilities",
     "  service list  Registered capability services",
@@ -373,8 +374,8 @@ async function main(): Promise<number> {
         `${JSON.stringify(
           {
             commands: [
-              "init", "status", "research", "doctor", "verify", "diff", "agent list", "config show",
-              "plugin list", "service list", "workspace create",
+              "init", "status", "research", "doctor", "verify", "diff", "agent list", "checkpoint",
+              "config show", "plugin list", "service list", "workspace create",
             ],
           },
           null,
@@ -651,6 +652,18 @@ async function main(): Promise<number> {
         } finally {
           await client.stop();
         }
+      }
+
+      case "checkpoint": {
+        // Checkpoint + Gate execution (spec section 150): attempt ≠ completion.
+        const { runCheckpointsCommand } = await import("./checkpoints.js");
+        const { config } = await effectiveConfig(projectRoot, parsed);
+        return await runCheckpointsCommand(parsed.args[0] ?? "list", {
+          projectRoot,
+          parsed,
+          clientOptions: (cfg: unknown) => clientOptions(parsed, cfg),
+          config,
+        });
       }
 
       case "workspace": {

@@ -19,6 +19,10 @@ import { dockerRuntimePlugin } from "@proagents/plugin-runtime-docker";
 import { accContextPlugin } from "@proagents/plugin-context-acc";
 import { codexAgentPlugin } from "@proagents/plugin-agent-codex";
 import { repoShieldPlugin } from "@proagents/plugin-repo-shield";
+import { behaviorGatePlugin } from "@proagents/plugin-gate-behavior";
+import { securityGatePlugin } from "@proagents/plugin-gate-security";
+import { humanGatePlugin } from "@proagents/plugin-gate-human";
+import { adversarialGatePlugin } from "@proagents/plugin-gate-adversarial";
 
 export function bundledPlugins(): PluginDefinition[] {
   return [
@@ -30,5 +34,10 @@ export function bundledPlugins(): PluginDefinition[] {
     accContextPlugin,
     codexAgentPlugin,
     repoShieldPlugin,
+    // Checkpoint gates (spec section 150): resolved per gate kind/provider.
+    behaviorGatePlugin,
+    securityGatePlugin,
+    humanGatePlugin,
+    adversarialGatePlugin,
   ];
 }

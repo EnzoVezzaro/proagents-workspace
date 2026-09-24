@@ -23,6 +23,17 @@ paw agent list    # detected agents + honest integration tiers [--json]
 
 Simple commands do not boot plugins or runtimes; capability activation is lazy. `paw status` answers: where am I, what project is this, what branch, what agents are available, what verification is configured.
 
+## Checkpoint Commands (spec section 150)
+
+```bash
+paw checkpoint list                     # show the plan: order, dependencies, gates [--json]
+paw checkpoint run                      # run the plan in dependency order (fail-closed)
+paw checkpoint run --checkpoint CP-001  # run a single checkpoint
+paw checkpoint status                   # plan state [--json]
+```
+
+Plans load from `.paw/checkpoints.json` (convention) or `checkpoints.plan` in `.paw/workspace.yaml`. Gates are PLUGINS resolved per kind/provider — behavior, security (Repo Shield), human, adversarial, and custom providers. The core rule: **attempt ≠ completion** — only passing gates complete a checkpoint; failed gates produce structured findings, and unregistered gates fail closed.
+
 ## Research Commands (spec section 149)
 
 ```bash
