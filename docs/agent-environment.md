@@ -11,7 +11,7 @@ Two CLIs appear in this ecosystem — do not confuse them:
 | CLI | Role | Status |
 |-----|------|--------|
 | `proagent` | Environment builder: compiles profiles and crews into harness artifacts from `proagents.yaml` | Installed tooling (v0.14.x) |
-| `paw` | This product's own CLI for creating and operating workspaces | Specification only — see [CLI Reference](cli-reference.md), not yet implemented |
+| `paw` | This product's own CLI for creating and operating workspaces | Implemented (V1) — see [CLI Reference](cli-reference.md); the convention-first surface (`paw init`/`status`/`research`/`verify`) is the shipped golden path (spec sections 148–149) |
 
 All commands on this page are `proagent` commands. They configure the repository's agent environment; they are not `paw` workspace commands.
 
@@ -126,7 +126,7 @@ Also verify the composed skill's knowledge files are present (setup has historic
 Following the documentation honesty rules:
 
 - **Skills are guidance, not enforcement.** The Freebuff harness (like most harnesses) has no native rule-enforcement surface; `proagent setup` reports this limitation explicitly. Permissions and approval gates in the skill text are advisory.
-- **Git guards are declarative.** Force push, branch deletion, and history rewriting are forbidden by `proagents.yaml` policy and the profile rules; actual enforcement must come from the harness or repository protection (the [Protection Layer](protection.md) pattern) once the product implementation lands.
+- **Git guards are declarative in skill text, enforced in the product.** Force push, branch deletion, and history rewriting are forbidden by `proagents.yaml` policy and the profile rules; the skill text remains advisory on Freebuff (no native rule-enforcement surface), while actual enforcement lives in the product's own guarded git plugin and repo-shield protection layer (the [Protection Layer](protection.md) pattern) — which block guarded operations before execution.
 - **MCP servers are real integrations**, resolved from declared capabilities — they run regardless of skill text.
 - **Derived content may drift from `.acc/config/`.** Tool lists and permission templates in generated skills come from the environment builder's catalog; when they disagree with `.acc/config/tools/` or this repository's policies, the repository configuration is authoritative — regenerate or correct the catalog input.
 
