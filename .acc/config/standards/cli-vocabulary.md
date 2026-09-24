@@ -25,7 +25,7 @@ Requires Node.js 18+. The published package is a SELF-CONTAINED bundle (packages
 
 ```text
 paw
-├── init ├── status ├── research ├── doctor ├── verify ├── diff   (convention-first surface)
+├── install ├── init ├── status ├── research ├── doctor ├── verify ├── diff   (bootstrap + convention-first surface)
 ├── workspace ├── runtime ├── repository ├── context
 ├── agent ├── plugin ├── git ├── pr
 ├── exec ├── shell ├── terminal ├── service
@@ -36,6 +36,7 @@ paw
 Key commands every document must agree on:
 
 ```bash
+paw install                                # agent bootstrap: the five-phase install (spec section 152)
 paw init                                   # convention-first: initialize current repository
 paw status | research | doctor | verify | diff   # convention-first surface (current repo)
 paw agent list                             # detected agents + integration tiers
@@ -75,6 +76,7 @@ Ergonomic rule (spec section 148): `paw verify`, `paw diff`, `paw status` operat
 
 - `workspace.yaml` — the declarative workspace definition (reproducibility: export → create --from).
 - `.paw/workspace.yaml` — the minimal convention-first project configuration (spec section 148); `version: 1` alone is valid.
+- Bootstrap vocabulary (spec section 152): installer command `npx @reposell/proagents-workspace@latest install`; contract dir `install/` (`manifest.yaml`, `install.yaml`, `AGENT.md`, `instructions.md`); template `templates/AGENTS.md`; target config dir stays `.paw/` — never `.proagents/` (that namespace belongs to the ProAgents project) and never `.agents/` in TARGET repositories (agent-owned).
 - **Workspace** (default) = the developer's project environment; **isolated/runtime workspace** = the explicit sandboxed mode (spec section 148). Never use "workspace" alone for the sandboxed mode.
 - Providers: `runtime` (e2b, docker, local), `repository` (github, gitlab, git), `context` (acc), `agent` (codex, claude, opencode, gemini, proagent).
 - Protection: provider `repo-shield`; Distribution: provider `reposell`.

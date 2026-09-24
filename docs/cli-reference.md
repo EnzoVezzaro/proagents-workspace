@@ -10,6 +10,7 @@ The CLI uses the same underlying Workspace API as the SDK — the CLI never dupl
 ## The Golden Path (convention-first)
 
 ```bash
+paw install       # agent bootstrap: inspect → understand → initialize → configure → verify [--json] [--verify]
 paw init          # make the current repository Workspace-aware (.paw/ only)
 paw status        # where am I, what is here, what is possible [--json]
 paw research      # product/environment discovery; ACC-aware [section 149]
@@ -33,6 +34,16 @@ paw checkpoint status                   # plan state [--json]
 ```
 
 Plans load from `.paw/checkpoints.json` (convention) or `checkpoints.plan` in `.paw/workspace.yaml`. Gates are PLUGINS resolved per kind/provider — behavior, security (Repo Shield), human, adversarial, and custom providers. The core rule: **attempt ≠ completion** — only passing gates complete a checkpoint; failed gates produce structured findings, and unregistered gates fail closed.
+
+## Install Command (spec section 152)
+
+```bash
+paw install            # five-phase bootstrap: inspect → understand → initialize → configure → verify
+paw install --json     # machine-readable install plan (what external agents parse)
+paw install --verify   # also execute the verification checks after the install
+```
+
+The agent bootstrap entrypoint: metadata-only, preserving, idempotent, accountless. It detects the project (languages, runtime, package manager, frameworks, agents), infers intent from `@README.md` + manifests (every inference names its source), creates `.paw/` metadata when absent, writes `AGENTS.md` agent notes only when none exist, and reports the verification plan without running it. Existing instructions and configuration are never overwritten. See [Agent Bootstrap](bootstrap.md).
 
 ## Lifecycle Commands (spec section 151)
 
@@ -58,6 +69,7 @@ Research consults context providers through the existing `ContextProvider` contr
 
 ```
 paw
+├── install         (agent bootstrap, spec section 152)
 ├── init            (convention-first)
 ├── status          (convention-first)
 ├── research        (convention-first)

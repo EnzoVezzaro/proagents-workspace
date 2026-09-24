@@ -13,6 +13,7 @@ ProAgents Workspace is an open-source, agent-first execution environment where A
 | Document | Description |
 |----------|-------------|
 | [Getting Started](getting-started.md) | Install, create a workspace, connect an agent, verify changes |
+| [Agent Bootstrap](bootstrap.md) | One-line agent-installable setup: the five-phase install contract (spec 152) |
 | [Configuration](configuration.md) | Workspace definition, filesystem structure, reproducibility |
 | [CLI Reference](cli-reference.md) | Every `paw` command, JSON output, structured errors, modes |
 | [Agent Environment](agent-environment.md) | This repository's ProAgents setup — professions, crew, harness artifacts, regeneration |

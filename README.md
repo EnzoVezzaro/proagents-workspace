@@ -5215,3 +5215,70 @@ paw lifecycle show | run | status
 ## Division of authority
 
 PAW owns the lifecycle, plugins own the capabilities, checkpoints own the work, gates own trust, evidence owns proof. Executors (agent harnesses) own how phase work gets done; the kernel only orchestrates phases and enforces policy (parallel, required, onFailure, maxRetries).
+
+# Agent bootstrap (section 152)
+
+The Workspace must be installable BY an AI agent, not merely FOR one. A human pastes one line into any coding agent that can run shell commands (Claude Code, Codex, Gemini CLI, OpenCode, …):
+
+```text
+Setup https://github.com/EnzoVezzaro/proagents-workspace for @README.md (project's instructions).
+```
+
+The agent — with no prior knowledge of ProAgents — reads this repository's bootstrap protocol and runs the deterministic installer:
+
+```bash
+npx @reposell/proagents-workspace@latest install
+```
+
+The ecosystem roles are unchanged (section 2): ProAgents is WHO the agent is (https://github.com/EnzoVezzaro/proagents), ACC is WHAT it understands, the Workspace is WHERE it works. The Workspace bootstrap never requires ProAgents and never speaks for it.
+
+## The distribution thesis
+
+> The GitHub repository is the distribution package; `AGENTS.md` is the universal bootstrap protocol; `npx @reposell/proagents-workspace@latest` is the deterministic installer; `.paw/` is the runtime configuration.
+
+## The contract files (this repository)
+
+| File | Role |
+|------|------|
+| `AGENTS.md` | Universal agent instructions — the entrypoint any agent reads first |
+| `install/manifest.yaml` | Machine-readable package metadata: name, version, install command, configuration directory, requires |
+| `install/install.yaml` | The install contract as data: five phases, what is written, what is NEVER touched |
+| `install/AGENT.md` | The bootstrap protocol — the exact steps an external agent follows |
+| `install/instructions.md` | The human-facing install guide |
+| `templates/AGENTS.md` | The shape of the AGENTS.md written into a target repository (generator in the SDK; tests pin the shape) |
+
+## The five phases
+
+`paw install` (the same code path as the npx entrypoint) runs:
+
+```
+inspect → understand → initialize → configure → verify
+```
+
+| Phase | What happens |
+|-------|--------------|
+| inspect | Detects languages, runtime, package manager, frameworks, monorepo, coding agents (spec 148 conventions) |
+| understand | Infers project intent — product type, domains, skills — from `@README.md` + manifests; every inference names its source |
+| initialize | Creates `.paw/` metadata only when absent; existing configuration is preserved |
+| configure | Writes `AGENTS.md` agent notes when absent; reports the verification plan and the canonical lifecycle (section 151) |
+| verify | Reports the verification plan; executes checks only when the host asks (`paw install --verify`) |
+
+## What an install never does
+
+- Modifies application code, rewrites `package.json`, or changes git state.
+- Overwrites an existing `AGENTS.md`, `CLAUDE.md`, `.cursorrules`, or `.paw/` configuration.
+- Runs the project's tests uninvited.
+- Requires an account, a token, or network access beyond npx itself.
+
+## The target repository afterwards
+
+```
+repo/
+├── AGENTS.md              ← agent notes (only if none existed)
+└── .paw/                  ← runtime configuration
+    ├── workspace.yaml     ← minimal; everything else is inferred
+    ├── sessions/
+    └── artifacts/
+```
+
+`.agents/` in the Workspace's own repository is the cross-agent comment channel; the Workspace never writes to `.agents/` in a target repository (section 146 hygiene: agent-owned files stay agent-owned). Inference is additive and honest: detection from manifests wins, the README fills what manifests cannot say, and every claim in the report names the file it came from.

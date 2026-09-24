@@ -1,0 +1,44 @@
+# ProAgents Workspace — machine-readable package manifest (spec section 152)
+#
+# The GitHub repository is the distribution package. This file is the
+# machine-readable metadata an external coding agent reads FIRST when asked
+# to "setup ProAgents Workspace". Keep `version` in sync with the released
+# CLI version (the npm package is the installer).
+
+name: proagents-workspace
+version: 0.3.0
+type: workspace-framework
+description: >-
+  The convention-first workstation for AI coding agents: one CLI (`paw`)
+  that prepares, verifies, and observes the workspace while the coding
+  agent works through its own interface — the terminal.
+
+install:
+  # The deterministic installer. Runs the five-phase contract
+  # (see install.yaml) against the CURRENT repository.
+  command: npx @reposell/proagents-workspace@latest install
+  target: repository
+
+entrypoint:
+  # Where an agent that does NOT know ProAgents starts reading.
+  instructions: AGENTS.md
+  bootstrap: install/AGENT.md
+
+configuration:
+  # Runtime configuration written into the TARGET repository.
+  # Note: `.agents/` is reserved for agent-owned cross-harness files;
+  # Workspace never writes there.
+  directory: .paw
+  config: .paw/workspace.yaml
+
+requires:
+  - node    # >= 18 (for `npx`)
+  - git     # optional in practice; without it the workspace degrades honestly
+
+safe: true            # metadata-only: never touches application code
+idempotent: true      # running twice changes nothing the second time
+ecosystem:
+  # Roles (README section 2): Workspace is WHERE — it never replaces the
+  # ProAgents (WHO) or ACC (WHAT) projects.
+  proagents: https://github.com/EnzoVezzaro/proagents
+  workspace: https://github.com/EnzoVezzaro/proagents-workspace

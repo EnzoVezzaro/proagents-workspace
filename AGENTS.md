@@ -19,7 +19,7 @@ Owner: proagents-workspace maintainers
 
 ## Inputs
 
-- `README.md` — the canonical product specification (151 numbered sections).
+- `README.md` — the canonical product specification (152 numbered sections).
 - `DISTRIBUTION.md` — the protection & distribution architecture supplement.
 - Community feedback, issues, and ecosystem requirements (ProAgents, ACC, Repo Shield, reposell).
 
@@ -27,6 +27,7 @@ Owner: proagents-workspace maintainers
 
 - `docs/` — the published documentation set (concepts, providers, security, CLI reference).
 - The `workspace.yaml` configuration schema (declarative workspace definition).
+- The `install/` bootstrap contract (`manifest.yaml`, `install.yaml`, `AGENT.md`, `instructions.md`) + `templates/AGENTS.md` — the agent-installable distribution surface (spec section 152).
 - The `paw` CLI command surface and the `@proagents/workspace` SDK contract.
 
 ## Dependencies

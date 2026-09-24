@@ -440,6 +440,9 @@ export async function initWorkspace(projectRoot: string): Promise<InitResult> {
   // workspace naturally through the filesystem, no proprietary API needed.
   const agentsMd = path.join(projectRoot, "AGENTS.md");
   if (!existsSync(agentsMd)) {
+    // Mirror of the AGENTS.md template from spec section 152 (the reviewed
+    // contract copy). The published npm bundle is one self-contained file, so
+    // the generator is inline here; the tests pin the shape.
     const summary = [
       "# Agent Notes",
       "",
@@ -450,7 +453,13 @@ export async function initWorkspace(projectRoot: string): Promise<InitResult> {
       project.frameworks.length > 0 ? `- Frameworks: ${project.frameworks.join(", ")}` : undefined,
       verification.checks.length > 0 ? `- Verification: ${verification.checks.map((c) => c.command).join(" → ")}` : undefined,
       "",
-      "Run `paw status` for the workspace picture; `paw verify` runs the checks above.",
+      "## Working here",
+      "",
+      "- Run `paw status` for the workspace picture (what is here, what is possible).",
+      "- Run `paw verify` to execute the verification checks above.",
+      "- Run `paw lifecycle show` to see the phases this workspace runs.",
+      "",
+      "`.paw/` is workspace metadata; application code is never modified by workspace commands.",
       "",
     ].filter((line) => line !== undefined);
     await writeFile(agentsMd, summary.join("\n"), "utf8");

@@ -25,6 +25,11 @@ and `.proagent/crews/` handoffs (structured, runtime state).
   (see `.acc/config/workflows/agent-coordination.md`).
 - Never put secrets, credentials, or unverified claims here.
 
+## [2026-09-24T18:35:00Z] freebuff — decision + handoff: agent bootstrap (spec §152) landed; PAW ≠ ProAgents naming locked
+For: all
+
+User decision recorded: ProAgents (github.com/EnzoVezzaro/proagents, npm `proagent`) and PAW/Workspace are TWO different projects — the bootstrap installer is the Workspace's own. Consequences now pinned in cli-vocabulary.md: installer command is `npx @reposell/proagents-workspace@latest install` (never `npx proagents`); target config dir stays `.paw/` (never `.proagents/` — that namespace belongs to ProAgents; never `.agents/` in TARGET repos — agent-owned). Shipped: `install/` contract (manifest.yaml, install.yaml, AGENT.md bootstrap protocol, instructions.md), `templates/AGENTS.md`, SDK `installWorkspace`/`inferProjectIntent` (README-driven intent with named provenance), `paw install` five-phase CLI + e2e tests, docs/bootstrap.md, README spec section 152, AGENTS.md count 152. Gate green: 281 tests, acc check 0 errors.
+
 ## [2026-09-24T18:05:00Z] freebuff — handoff: canonical lifecycle (spec §151) complete, gate green
 For: all
 

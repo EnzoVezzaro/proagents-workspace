@@ -1,0 +1,41 @@
+# The install contract (spec section 152) — what an install does, as data.
+#
+# Declared so any agent (or human) can verify an install against its
+# contract: what runs, what is written, what is NEVER touched. `paw install`
+# implements exactly this; the contract tests pin it.
+
+version: 1
+
+phases:
+  - id: inspect
+    does: detect languages, runtime, package manager, frameworks, monorepo, coding agents
+    reads: [package.json, pyproject.toml, Cargo.toml, go.mod, Gemfile, composer.json, pom.xml, lockfiles]
+
+  - id: understand
+    does: infer project intent (product type, domains, skills) from README + manifests
+    reads: [README.md]
+
+  - id: initialize
+    does: create .paw/ metadata (workspace.yaml, sessions/, artifacts/) when absent
+    writes: [.paw/]
+    preserves: [existing .paw/workspace.yaml]
+
+  - id: configure
+    does: write AGENTS.md agent notes when absent; report verification plan and lifecycle
+    writes: [AGENTS.md]
+    preserves: [existing AGENTS.md]
+
+  - id: verify
+    does: report the verification plan; execute checks only with --verify
+    runs_by_default: nothing
+
+never:
+  - modifies application code
+  - rewrites package.json or any manifest
+  - changes git state (no add, commit, branch, push)
+  - overwrites an existing configuration file
+  - requires an account, a token, or network access beyond npx itself
+
+exit_codes:
+  0: install completed (all five phases)
+  1: install failed (structured error on stderr)

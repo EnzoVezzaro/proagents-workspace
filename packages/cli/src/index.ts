@@ -28,6 +28,7 @@ import {
   detectedAgents,
   inferVerification,
   initWorkspace,
+  installWorkspace,
   isInitialized,
   loadConfig,
   pawDirFor,
@@ -247,6 +248,33 @@ function renderStatus(projectRoot: string, parsed: ParsedArgs): Promise<number> 
   })();
 }
 
+/**
+ * `paw install` (spec section 152): the agent bootstrap entrypoint. Any
+ * external coding agent can run it verbatim; the output is the report the
+ * agent relays back to the human ("report the resulting configuration").
+ */
+async function runInstall(projectRoot: string, parsed: ParsedArgs): Promise<number> {
+  const plan = await installWorkspace(projectRoot);
+  if (parsed.json) {
+    process.stdout.write(`${JSON.stringify({ command: "install", ...plan }, null, 2)}\n`);
+    return 0;
+  }
+  process.stdout.write(`Installing ProAgents Workspace into ${plan.target.projectRoot}\n\n`);
+  for (const phase of plan.phases) {
+    const mark = phase.status === "completed" ? "✓" : "○";
+    process.stdout.write(`${mark} ${phase.phase}\n`);
+    for (const note of phase.notes) process.stdout.write(`    ${note}\n`);
+  }
+  process.stdout.write("\nWorkspace ready.\n");
+  process.stdout.write("  · `paw status` — the workspace picture\n");
+  process.stdout.write("  · `paw verify` — run the verification checks\n");
+  process.stdout.write("  · `paw lifecycle show` — the phases this workspace runs\n");
+  // `--verify` executes the verification checks (the default only reports
+  // the plan — an install never runs a foreign project's tests uninvited).
+  if (parsed.flags["verify"] === true) return await runVerify(projectRoot, parsed);
+  return 0;
+}
+
 async function runVerify(projectRoot: string, parsed: ParsedArgs): Promise<number> {
   const { config, sources } = await effectiveConfig(projectRoot, parsed);
   const commands =
@@ -330,6 +358,7 @@ function usage(): string {
     "",
     "Commands:",
     "  init          Make the current repository Workspace-aware (.paw/)",
+    "  install       Agent bootstrap: inspect → understand → initialize → configure → verify (spec 152)",
     "  status        Where am I, what is here, what is possible",
     "  research      Discover product/environment facts (ACC-aware), ask what's missing",
     "  doctor        Health of the workspace and its providers",
@@ -375,7 +404,7 @@ async function main(): Promise<number> {
         `${JSON.stringify(
           {
             commands: [
-              "init", "status", "research", "doctor", "verify", "diff", "agent list", "checkpoint",
+              "init", "install", "status", "research", "doctor", "verify", "diff", "agent list", "checkpoint",
               "lifecycle", "config show", "plugin list", "service list", "workspace create",
             ],
           },
@@ -473,6 +502,9 @@ async function main(): Promise<number> {
         process.stdout.write("\nEverything required is ready.\n");
         return 0;
       }
+
+      case "install":
+        return await runInstall(projectRoot, parsed);
 
       case "verify":
         return await runVerify(projectRoot, parsed);
