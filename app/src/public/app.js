@@ -92,7 +92,7 @@ function renderChatList() {
           </div>
         </li>`;
       }).join("")
-    : `<li class="muted small" style="cursor:default">no chats yet</li>`;
+    : `<li class="list-empty">No chats yet.<br>Every chat gets its own isolated workspace.</li>`;
   if (state.selected) {
     const agent = state.chats.find((a) => a.id === state.selected);
     if (agent) $("chat-status").className = `status-dot ${agent.status}`;
@@ -108,9 +108,10 @@ function selectChat(id) {
   state.codeOpen = false;
   $("code-pane").classList.add("hidden");
   $("chat-pane").style.display = "";
-  $("toggle-code").textContent = "⌘ Code";
-  $("view-empty").classList.add("hidden");
-  $("view-chat").classList.remove("hidden");
+  const codeLabel = $("toggle-code")?.querySelector(".btn-label");
+  if (codeLabel) codeLabel.textContent = "Code";
+  else if ($("toggle-code")) $("toggle-code").textContent = "⌘ Code";
+  showView("chat");
   renderChatList();
   renderChat();
   // Follow the selected chat's workspace with the terminal pane.
@@ -131,7 +132,7 @@ function renderChat() {
         <div class="who">${m.role === "user" ? "YOU" : `${agent.id} · ${agent.profileId}`}</div>
         <pre class="${m.role === "agent" && m.exitCode !== 0 ? "err" : ""}">${escapeHtml(m.text)}</pre>
       </div>`).join("")
-    : `<div class="muted" style="margin:auto">No messages yet — say what the crew should do.</div>`;
+    : `<div class="messages-empty"><div style="font-size:22px;margin-bottom:8px">◇</div>No messages yet — say what the crew should do.</div>`;
   const box = $("messages");
   box.scrollTop = box.scrollHeight;
   // Deferred harness (provisioning failed / not yet launched): offer the
@@ -275,7 +276,9 @@ $("editor-split")?.addEventListener("mousedown", (ev) => {
 async function toggleCode() {
   state.codeOpen = !state.codeOpen;
   $("code-pane").classList.toggle("hidden", !state.codeOpen);
-  $("toggle-code").textContent = state.codeOpen ? "⌘ Chat" : "⌘ Code";
+  const label = $("toggle-code")?.querySelector(".btn-label");
+  if (label) label.textContent = state.codeOpen ? "Chat" : "Code";
+  else if ($("toggle-code")) $("toggle-code").textContent = state.codeOpen ? "⌘ Chat" : "⌘ Code";
   if (state.codeOpen) await loadTree("");
 }
 

@@ -13,8 +13,8 @@
     <!-- ================= Sidebar: chats = workspaces ================= -->
     <nav id="sidebar">
       <div class="side-head">
-        <div class="brand">ProAgents <span>Workspace</span></div>
-        <button id="new-chat-btn" class="btn primary small" title="New chat = new configured workspace">+ New chat</button>
+        <div class="brand"><span class="logo" aria-hidden="true">◧</span>ProAgents&nbsp;<span>Workspace</span></div>
+        <button id="new-chat-btn" class="btn primary small" title="New chat = new configured workspace (⌘K)">+ New chat</button>
       </div>
       <div class="side-search"><input id="chat-filter" placeholder="Search chats…" /></div>
       <ul id="chat-list" class="chat-list"></ul>
@@ -27,9 +27,17 @@
       <!-- Empty state -->
       <section id="view-empty" class="view">
         <div class="empty-hero">
-          <h1>ProAgents Workspace</h1>
-          <p class="muted">Every chat is a workspace: pick a folder, a harness (the real DeepSeek&nbsp;Harness engine, Claude&nbsp;Code, OpenCode, Gemini) and the proagents to work with.</p>
-          <button id="empty-new-chat" class="btn primary">+ Start your first chat</button>
+          <div class="empty-glow" aria-hidden="true"></div>
+          <div class="empty-logo" aria-hidden="true">◧</div>
+          <h1>Every chat is a <span class="grad">workspace</span></h1>
+          <p class="muted">Pick a folder or repo, a harness engine and a proagent crew — each chat gets a fresh, isolated workspace of its own. Chats never mix.</p>
+          <button id="empty-new-chat" class="btn primary lg">+ Start your first chat</button>
+          <div class="empty-chips">
+            <div class="chip"><b>Isolated by design</b><span>projects copied / cloned per chat</span></div>
+            <div class="chip"><b>Real terminal</b><span>watch the harness work live</span></div>
+            <div class="chip"><b>Agent Canvas</b><span>every crew member at a glance</span></div>
+          </div>
+          <p class="empty-hint mono"><bdo dir="ltr">⌘K</bdo> commands · <bdo dir="ltr">⌘B</bdo> code · <bdo dir="ltr">⌘J</bdo> terminal · <bdo dir="ltr">⌘I</bdo> inspector</p>
         </div>
       </section>
 
@@ -50,45 +58,54 @@
       <section id="view-chat" class="view hidden">
         <header id="chat-header">
           <div class="chat-title-wrap">
-            <span id="chat-status" class="status-dot"></span>
-            <h1 id="chat-title"></h1>
-            <span id="chat-meta" class="muted mono"></span>
-            <div id="lifecycle-rail" class="lifecycle-rail mono"></div>
+            <div class="chat-title-row">
+              <span id="chat-status" class="status-dot"></span>
+              <h1 id="chat-title"></h1>
+            </div>
+            <div class="chat-title-row">
+              <span id="chat-meta" class="muted mono"></span>
+              <div id="lifecycle-rail" class="lifecycle-rail mono"></div>
+            </div>
           </div>
           <div class="chat-actions">
-            <button id="chat-launch" class="btn small primary hidden" title="Provisioning finished or failed — launch the agent harness into the workspace terminal">▶ Launch harness</button>
-            <button id="lifecycle-run" class="btn small" title="Run this chat's configured development lifecycle (spec §6/§16) — stages type their tasks into the workspace terminal">▶ Run lifecycle</button>
-            <button id="toggle-code" class="btn small">⌘ Code</button>
-            <button id="toggle-term" class="btn small">⌘J Terminal</button>
-            <button id="toggle-inspect" class="btn small">⌘I Inspect</button>
-            <button id="chat-settle" class="btn small" title="Settle: mark finished work out of the active list — workspace and history stay on disk">✓ Settle</button>
-            <button id="chat-purge" class="btn small danger" title="Purge: stop the crew and delete this chat's workspace (refused while uncommitted work exists)">🗑 Purge</button>
-            <button id="chat-stop" class="btn small danger">Stop</button>
+            <button id="chat-launch" class="btn small primary hidden" title="Provisioning finished or failed — launch the agent harness into the workspace terminal">▶ <span class="btn-label">Launch harness</span></button>
+            <button id="lifecycle-run" class="btn small" title="Run this chat's configured development lifecycle (spec §6/§16) — stages type their tasks into the workspace terminal">▶ <span class="btn-label">Lifecycle</span></button>
+            <span class="btn-sep" aria-hidden="true"></span>
+            <button id="toggle-code" class="btn small" title="Toggle the code pane (⌘B)">⌘ <span class="btn-label">Code</span></button>
+            <button id="toggle-term" class="btn small" title="Toggle the workspace terminal (⌘J)">⌘J <span class="btn-label">Terminal</span></button>
+            <button id="toggle-inspect" class="btn small" title="Toggle the inspector (⌘I)">⌘I <span class="btn-label">Inspect</span></button>
+            <span class="btn-sep" aria-hidden="true"></span>
+            <button id="chat-settle" class="btn small" title="Settle: mark finished work out of the active list — workspace and history stay on disk">✓ <span class="btn-label">Settle</span></button>
+            <button id="chat-purge" class="btn small danger" title="Purge: stop the crew and delete this chat's workspace (refused while uncommitted work exists)">🗑 <span class="btn-label">Purge</span></button>
+            <button id="chat-stop" class="btn small danger" title="Stop the crew">■ <span class="btn-label">Stop</span></button>
           </div>
         </header>
 
         <div id="chat-body">
-          <!-- chat pane -->
-          <div id="chat-pane">
-            <div id="messages" class="messages"></div>
-            <div class="composer">
-              <textarea id="chat-input" placeholder="Message the crew… (Enter to send, Shift+Enter for newline)"></textarea>
-              <button id="chat-send" class="btn primary">Send</button>
+          <div class="views-row">
+            <!-- chat pane -->
+            <div id="chat-pane">
+              <div id="messages" class="messages"></div>
+              <div class="composer">
+                <textarea id="chat-input" placeholder="Message the crew… (Enter to send, Shift+Enter for newline)"></textarea>
+                <button id="chat-send" class="btn primary">Send</button>
+              </div>
             </div>
-          </div>
-          <!-- code pane (VS Code-like) -->
-          <div id="code-pane" class="hidden">
-            <div id="editor-tree" class="editor-tree mono"></div>
-            <div id="editor-split"></div>
-            <div class="editor-pane">
-            <div id="editor-tabs" class="editor-tabs mono"></div>
-            <div id="editor-file-name" class="muted small mono">no file open</div>
-            <textarea id="editor-content" class="mono" spellcheck="false" placeholder="Select a file from the tree…"></textarea>
-            <div class="editor-actions">
-              <span id="editor-status" class="muted small"></span>
-              <button id="editor-save" class="btn small primary" disabled>Save</button>
+            <!-- code pane (VS Code-like) -->
+            <div id="code-pane" class="hidden">
+              <div id="editor-tree" class="editor-tree mono"></div>
+              <div id="editor-split"></div>
+              <div class="editor-pane">
+                <div id="editor-tabs" class="editor-tabs mono"></div>
+                <div id="editor-file-name" class="muted small mono">no file open</div>
+                <textarea id="editor-content" class="mono" spellcheck="false" placeholder="Select a file from the tree…"></textarea>
+                <div class="editor-actions">
+                  <span id="editor-status" class="muted small"></span>
+                  <span class="sb-spacer"></span>
+                  <button id="editor-save" class="btn small primary" disabled>Save</button>
+                </div>
+              </div>
             </div>
-          </div>
           </div>
           <!-- REAL terminal panel (node-pty, VS Code-style bottom panel) -->
           <div id="term-panel" class="hidden">
@@ -96,7 +113,7 @@
               <span class="term-title">TERMINAL</span>
               <span id="term-cwd" class="muted small mono"></span>
               <span class="sb-spacer"></span>
-              <button id="term-clear" class="btn small">clear</button>
+              <button id="term-clear" class="btn small ghost">clear</button>
               <button id="term-close" class="btn small danger">✕</button>
             </div>
             <div id="term-host"></div>
