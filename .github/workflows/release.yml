@@ -1,0 +1,76 @@
+name: Release gate
+
+# Publishes @reposell/proagents-workspace when a v* tag is pushed — but
+# ONLY after the full gate AND the self-diagnostics pass. This is the
+# automation of the release checklist's blocking section (spec sections
+# 61/153): drift can no longer reach the registry.
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: Gate + publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: npm
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+        # registry-url is intentionally NOT set: publishing stays a manual,
+        # verified step (tarball rehearsal + cold install per the release
+        # checklist). This workflow gates the tag; it does not publish.
+
+      - uses: pnpm/action-setup@v4
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Test
+        run: pnpm test
+
+      - name: Build
+        run: pnpm build
+
+      - name: Self-diagnostics (paw check)
+        run: node packages/cli/dist/index.js check
+
+      - name: Verify the tagged version is coherent
+        run: |
+          PKG_VERSION=$(node -p "require('./packages/cli/package.json').version")
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          if [ "$PKG_VERSION" != "$TAG_VERSION" ]; then
+            echo "::error::tag v$TAG_VERSION but packages/cli is $PKG_VERSION — the release commit and tag disagree"
+            exit 1
+          fi
+          if ! grep -q "## [$PKG_VERSION]" CHANGELOG.md; then
+            echo "::error::CHANGELOG.md has no ## [$PKG_VERSION] entry — add it before releasing"
+            exit 1
+          fi
+          if ! grep -q "^version: $PKG_VERSION" install/manifest.yaml; then
+            echo "::error::install/manifest.yaml does not carry version $PKG_VERSION (PAW001 would fail)"
+            exit 1
+          fi
+          echo "tag, packages, changelog, and manifest all say $PKG_VERSION"
+
+      - name: Registry is the human's step
+        run: |
+          echo "All gates passed for ${GITHUB_REF_NAME}."
+          echo "Publishing remains a deliberate human action:"
+          echo "  pnpm --filter proagents-workspace bundle && pnpm --filter proagents-workspace pack:npm"
+          echo "  cd packages/cli/npm-stage && npm pack && npm install -g ./<tarball>  # rehearse"
+          echo "  npm publish --access public"

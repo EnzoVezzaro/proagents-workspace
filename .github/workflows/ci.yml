@@ -1,0 +1,82 @@
+name: CI
+
+# The framework polices itself on every push (spec section 153):
+#   1. the full gate — lint, typecheck, tests, build
+#   2. `paw check` — PAW0xx-coded drift diagnostics over the framework's
+#      own configuration artifacts (manifest/template/spec/version/
+#      changelog/cli-reference coherence)
+#   3. the docs ↔ code pact — the shipped CLI must match what docs promise
+# (acc check and the docs link check run locally; the link check is a pact
+# test inside the suite.)
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  gate:
+    name: Gate (lint · typecheck · test · build) + paw check
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: pnpm/action-setup@v4
+        # Version is read from package.json#packageManager (pnpm@10.18.3).
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Test
+        run: pnpm test
+
+      - name: Build
+        run: pnpm build
+
+      # Spec section 153: drift is caught on every push, not just at
+      # release. Runs the JUST-BUILT binary so the check always inspects
+      # the code being merged, never a stale artifact.
+      - name: Self-diagnostics (paw check)
+        run: node packages/cli/dist/index.js check
+
+      # The pact test inside `pnpm test` already asserts docs ↔ code
+      # coherence against the built binary; this reruns it explicitly so a
+      # failure names the contract, not just "test failed".
+      - name: Docs ↔ code pact
+        run: npx vitest run test/integration/docs-code-pact.test.ts
+
+  acc:
+    name: acc check (0 errors required)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # `acc check` is the ACC product's own gate for this repository's
+      # context/contract integrity (ACC0xx). It validates the boundary
+      # independently — a paw check failure can never mask an ACC failure
+      # or vice versa (three checkers, three domains, no coupling).
+      - name: Install ACC CLI
+        run: npm install -g acc-code-context
+
+      - name: acc check
+        run: acc check
