@@ -83,11 +83,11 @@ jobs:
             echo "::error::tag v$TAG_VERSION but packages/cli is $PKG_VERSION — the release commit and tag disagree"
             exit 1
           fi
-          if ! grep -q "## [$PKG_VERSION]" CHANGELOG.md; then
+          if ! grep -qF "## [$PKG_VERSION]" CHANGELOG.md; then
             echo "::error::CHANGELOG.md has no ## [$PKG_VERSION] entry — add it before releasing"
             exit 1
           fi
-          if ! grep -q "^version: $PKG_VERSION" install/manifest.yaml; then
+          if ! grep -qF "version: $PKG_VERSION" install/manifest.yaml; then
             echo "::error::install/manifest.yaml does not carry version $PKG_VERSION (PAW001 would fail)"
             exit 1
           fi
