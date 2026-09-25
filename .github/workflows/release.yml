@@ -118,7 +118,8 @@ jobs:
           printf '{"name":"smoke","scripts":{"test":"echo ok"}}\n' > "$SMOKE/package.json"
           printf '# Smoke\n\nA local-first browser application with AI features.\n' > "$SMOKE/README.md"
           cd "$SMOKE"
-          /tmp/rehearsal/bin/paw install README.md --json | grep -q '"command": "install"'
+          # paw install is a stable alias of init; --json reports command: "init"
+          /tmp/rehearsal/bin/paw install README.md --json | grep -q '"command": "init"'
           test -f .paw/workspace.yaml
           grep -q 'productType: browser-application' .paw/workspace.yaml
           echo "rehearsal PASSED: golden path works from the tarball"
