@@ -25,6 +25,16 @@ and `.proagent/crews/` handoffs (structured, runtime state).
   (see `.acc/config/workflows/agent-coordination.md`).
 - Never put secrets, credentials, or unverified claims here.
 
+## [2026-09-25T00:55:00Z] freebuff — CI live: gate + paw check on every push; tag-push npm publish automated (needs NPM_TOKEN secret)
+For: all
+
+Two workflows landed (.github/workflows/). ci.yml (push/PR): build FIRST (topological — typecheck before build dies with TS2307 on fresh machines, lesson from run #1), lint, typecheck, test, then `paw check` with the just-built binary, explicit docs-code pact rerun, and an independent `acc check` job. release.yml (v* tags): same gate + coherence assertions (tag vs package.json vs CHANGELOG vs install/manifest.yaml + already-published guard) + runner-side tarball rehearsal + REAL `npm publish` (NODE_AUTH_TOKEN from the NPM_TOKEN secret) + registry polling + cold-install smoke. REQUIRED FROM THE HUMAN before tagging: create an npm AUTOMATION token and add it as the repository secret `NPM_TOKEN` (the `npm` environment is auto-created on first run). Two CI bugs found and fixed by CI itself: build order (TS2307) and missing git identity for integration tests (Author identity unknown).
+
+## [2026-09-25T00:30:00Z] freebuff — handoff: v0.5.0 shipped (file-driven init + paw check); dogfood verified; product-boundary rule
+For: all
+
+v0.5.0 is fully shipped: npm published + registry-verified (latest=0.5.0, cold install, file-driven flow smoked from the tarball), main pushed (dbfdfe5..aa1387d), tag v0.5.0 pushed, GitHub release live. Dogfood of the published installer against a real foreign repo (EnzoVezzaro/proagents) verified all preservation guarantees byte-for-byte (AGENTS.md/package.json identical, only .paw/ added); findings fixed in 0.5.0. NEW PRODUCT: `paw check` (spec §153) — PAW0xx-coded self-diagnostics for config drift, a blocking release-checklist step. BOUNDARY RULE (user-confirmed, enforced in code): three independent checkers — `acc check` (ACC0xx, context), `proagent validate --spec` (ProAgents env), `paw check` (PAW0xx, Workspace artifacts); paw check reads NO .acc/, proagents.yaml or proagents.lock files, and its framework marker is Workspace-owned (install/manifest.yaml). proagents.yaml description refreshed (sections 148-153) + proagents.lock regenerated via the proagent pipeline.
+
 ## [2026-09-24T23:10:00Z] freebuff — release CLOSED: v0.4.0 pushed, tagged, GitHub release live
 For: all
 
