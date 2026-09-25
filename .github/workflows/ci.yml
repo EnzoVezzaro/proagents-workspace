@@ -49,6 +49,13 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
+      # Integration tests exercise REAL git commits through the repository
+      # provider; the runner has no git identity by default.
+      - name: Configure git identity for tests
+        run: |
+          git config --global user.name "Paw CI"
+          git config --global user.email "paw-ci@users.noreply.github.com"
+
       - name: Test
         run: pnpm test
 
