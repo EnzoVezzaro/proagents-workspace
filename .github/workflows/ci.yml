@@ -36,6 +36,13 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # Build comes FIRST: workspace packages import each other's compiled
+      # declarations (@proagents/contracts/dist/*.d.ts, gitignored), and
+      # `pnpm -r build` emits them in topological order. Typechecking before
+      # building fails with TS2307 on a fresh CI machine.
+      - name: Build (workspace packages, topological order)
+        run: pnpm build
+
       - name: Lint
         run: pnpm lint
 
@@ -44,9 +51,6 @@ jobs:
 
       - name: Test
         run: pnpm test
-
-      - name: Build
-        run: pnpm build
 
       # Spec section 153: drift is caught on every push, not just at
       # release. Runs the JUST-BUILT binary so the check always inspects

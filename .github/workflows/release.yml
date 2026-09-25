@@ -1,9 +1,16 @@
-name: Release gate
+name: Release
 
-# Publishes @reposell/proagents-workspace when a v* tag is pushed — but
-# ONLY after the full gate AND the self-diagnostics pass. This is the
-# automation of the release checklist's blocking section (spec sections
-# 61/153): drift can no longer reach the registry.
+# Publishes @reposell/proagents-workspace when a v* tag is pushed.
+#
+# Pipeline (the release checklist's blocking section, automated):
+#   full gate → paw check → tag/version/changelog/manifest coherence →
+#   bundle → stage → tarball rehearsal (install + smoke ON THE RUNNER) →
+#   npm publish → registry verification → cold-install smoke.
+#
+# Requires the NPM_TOKEN secret: an npm AUTOMATION token for the @reposell
+# scope (Repository → Settings → Secrets and variables → Actions). An
+# automation token bypasses 2FA for CI publishes; never use a publish token
+# with broader rights than the scope needs.
 
 on:
   push:
@@ -13,9 +20,13 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   publish:
-    name: Gate + publish
+    name: Gate → rehearse → publish → verify
     runs-on: ubuntu-latest
     timeout-minutes: 20
     environment: npm
@@ -25,14 +36,17 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-        # registry-url is intentionally NOT set: publishing stays a manual,
-        # verified step (tarball rehearsal + cold install per the release
-        # checklist). This workflow gates the tag; it does not publish.
+          registry-url: https://registry.npmjs.org/
 
       - uses: pnpm/action-setup@v4
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      # Build FIRST (topological order emits the dist/ declarations that
+      # typecheck needs on a fresh machine — see ci.yml).
+      - name: Build (workspace packages, topological order)
+        run: pnpm build
 
       - name: Lint
         run: pnpm lint
@@ -43,9 +57,7 @@ jobs:
       - name: Test
         run: pnpm test
 
-      - name: Build
-        run: pnpm build
-
+      # Spec section 153: no drift reaches the registry.
       - name: Self-diagnostics (paw check)
         run: node packages/cli/dist/index.js check
 
@@ -65,12 +77,62 @@ jobs:
             echo "::error::install/manifest.yaml does not carry version $PKG_VERSION (PAW001 would fail)"
             exit 1
           fi
-          echo "tag, packages, changelog, and manifest all say $PKG_VERSION"
+          if npm view "@reposell/proagents-workspace@$PKG_VERSION" version --prefer-online >/dev/null 2>&1; then
+            echo "::error::$PKG_VERSION is already on the registry — never republish a version"
+            exit 1
+          fi
+          echo "coherent: tag, packages, changelog, manifest all say $PKG_VERSION; not yet published"
 
-      - name: Registry is the human's step
+      - name: Bundle the self-contained CLI
+        run: pnpm --filter proagents-workspace bundle
+
+      - name: Stage the npm package
+        run: pnpm --filter proagents-workspace pack:npm
+
+      # Rehearsal on the runner: pack the stage dir, install the TARBALL
+      # into a scratch prefix, smoke the golden path (version + check +
+      # file-driven init). Nothing touches the registry yet.
+      - name: Rehearse the tarball
         run: |
-          echo "All gates passed for ${GITHUB_REF_NAME}."
-          echo "Publishing remains a deliberate human action:"
-          echo "  pnpm --filter proagents-workspace bundle && pnpm --filter proagents-workspace pack:npm"
-          echo "  cd packages/cli/npm-stage && npm pack && npm install -g ./<tarball>  # rehearse"
-          echo "  npm publish --access public"
+          cd packages/cli/npm-stage
+          TARBALL=$(npm pack | tail -1)
+          echo "rehearsal tarball: $TARBALL"
+          mkdir -p /tmp/rehearsal && npm install -g --prefix /tmp/rehearsal "./$TARBALL"
+          /tmp/rehearsal/bin/paw --version
+          /tmp/rehearsal/bin/paw check >/dev/null || true
+          SMOKE=$(mktemp -d)
+          printf '{"name":"smoke","scripts":{"test":"echo ok"}}\n' > "$SMOKE/package.json"
+          printf '# Smoke\n\nA local-first browser application with AI features.\n' > "$SMOKE/README.md"
+          cd "$SMOKE"
+          /tmp/rehearsal/bin/paw install README.md --json | grep -q '"command": "install"'
+          test -f .paw/workspace.yaml
+          grep -q 'productType: browser-application' .paw/workspace.yaml
+          echo "rehearsal PASSED: golden path works from the tarball"
+
+      - name: Publish to npm
+        run: |
+          cd packages/cli/npm-stage
+          npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Verify the registry
+        run: |
+          PKG_VERSION="${GITHUB_REF_NAME#v}"
+          for attempt in 1 2 3 4 5 6; do
+            LIVE=$(npm view "@reposell/proagents-workspace@$PKG_VERSION" version --prefer-online 2>/dev/null || true)
+            if [ "$LIVE" = "$PKG_VERSION" ]; then
+              echo "registry confirms $PKG_VERSION"
+              exit 0
+            fi
+            echo "attempt $attempt: registry not yet showing $PKG_VERSION, waiting…"
+            sleep 45
+          done
+          echo "::error::registry never showed $PKG_VERSION — investigate the publish"
+          exit 1
+
+      - name: Cold-install smoke
+        run: |
+          mkdir -p /tmp/cold && npm install -g --prefix /tmp/cold @reposell/proagents-workspace
+          /tmp/cold/bin/paw --version
+          echo "cold install PASSED"

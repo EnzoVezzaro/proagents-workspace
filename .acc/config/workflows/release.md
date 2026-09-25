@@ -43,6 +43,8 @@ Stable-contract checklist before publishing a ProAgents Workspace documentation 
 
 ## npm publish (when releasing the CLI)
 
+> **Automation:** pushing a `v*` tag triggers `.github/workflows/release.yml`, which runs the full gate + `paw check`, asserts tag/package/changelog/manifest coherence, rehearses the tarball on the runner, publishes (requires the `NPM_TOKEN` repository secret), and verifies the registry + cold install. The manual checklist below remains the source of truth and the fallback when CI is unavailable.
+
 - [ ] `pnpm --filter proagents-workspace bundle` produces the self-contained bundle (dist/paw.bundle.mjs, zero runtime deps).
 - [ ] `pnpm --filter proagents-workspace pack:npm` stages `@reposell/proagents-workspace` (bundle + LICENSE + npm README + scoped manifest).
 - [ ] Tarball rehearsed: `npm pack` in the stage dir, `npm install -g ./<tarball>` into a scratch prefix, `paw --version` + golden-path smoke in a scratch repo.
