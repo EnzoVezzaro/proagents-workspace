@@ -7,7 +7,7 @@ The published documentation set for ProAgents Workspace — the distilled, navig
 ## Responsibilities
 
 - Document the complete product surface: architecture, configuration, providers, lifecycle, verification, security, protection, distribution, and the `paw` CLI reference.
-- Never contradict `README.md` (the canonical spec, 140 numbered sections) or `DISTRIBUTION.md`.
+- Never contradict `README.md` (the canonical spec, 153 numbered sections) or `DISTRIBUTION.md`.
 - Keep every cross-link valid — every Markdown link must resolve to an existing document or anchor.
 - Keep command examples consistent: the CLI binary is `paw`, the npm package is `proagents-workspace`, the SDK is `@proagents/workspace`.
 - Keep all documents aligned with the design principles: agent-first, runtime-neutral, repository-neutral, context-neutral, agent-neutral, reproducible.
@@ -23,7 +23,7 @@ Owner: proagents-workspace maintainers
 
 ## Outputs
 
-- The documentation index (`index.md`) and 15 concept/provider/reference documents.
+- The documentation index (`index.md`) and the concept/provider/reference documents.
 - The `workspace.yaml` configuration reference (`configuration.md`).
 - The `paw` CLI contract (`cli-reference.md`).
 
@@ -46,7 +46,7 @@ Owner: proagents-workspace maintainers
 Organized as a documentation set with a single entry point:
 
 - `index.md` — the table of contents, grouped: Getting Started, Concepts, Providers, Safety & Trust, Distribution.
-- Getting started: `getting-started.md`, `configuration.md`, `cli-reference.md`, `agent-environment.md`.
+- Getting started: `getting-started.md`, `bootstrap.md`, `paw-install-runbook.md`, `configuration.md`, `cli-reference.md`, `agent-environment.md`, `health-checks.md`, `workspace-implementation.md`.
 - Concepts: `product-model.md`, `architecture.md`, `lifecycle.md`.
 - Providers: `runtime-providers.md`, `repository-providers.md`, `context-providers.md`, `agent-providers.md`.
 - Safety & Trust: `security.md`, `protection.md`, `verification.md`.

@@ -14,6 +14,7 @@ ProAgents Workspace is an open-source, agent-first execution environment where A
 |----------|-------------|
 | [Getting Started](getting-started.md) | Install, create a workspace, connect an agent, verify changes |
 | [Agent Bootstrap](bootstrap.md) | One-line agent-installable setup: the five-phase install contract (spec 152) |
+| [PAW Installation Runbook](paw-install-runbook.md) | AI-agent contract to install, set up, verify, and report a complete ProAgents Workspace |
 | [Self-Diagnostics](health-checks.md) | `paw check`: PAW0xx-coded drift detection over the framework's own config (spec 153) |
 | [Configuration](configuration.md) | Workspace definition, filesystem structure, reproducibility |
 | [CLI Reference](cli-reference.md) | Every `paw` command, JSON output, structured errors, modes |

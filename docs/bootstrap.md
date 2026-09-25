@@ -73,4 +73,9 @@ paw lifecycle show    # the phases this workspace runs
 
 See [Configuration](configuration.md) for what lives in
 `.paw/workspace.yaml`, and [Lifecycle](lifecycle.md) for the canonical
-phase flow the install sets up.
+phase flow the install sets up. For the complete AI-agent install, setup,
+and completion contract — including the long-run playbook, verification
+gates, failure handling, and the final report — use the [PAW Installation
+Runbook](paw-install-runbook.md). To install the separate ProAgents
+professional profiles or a profile-backed crew, follow the ProAgents
+project's own guidance.
