@@ -20,6 +20,8 @@ codex           # your existing agent keeps working
 
 No runtime required. No cloud account required. No Docker, E2B, GitHub, ACC, ProAgents, or MCP required.
 
+Installing into a repository with an AI agent? The complete **install → set up → complete** contract — every command, gate, stop rule, and the final report — is the [PAW Installation Runbook](docs/paw-install-runbook.md).
+
 It is designed to work with:
 
 * Codex
@@ -5306,6 +5308,8 @@ The process for an agent, in order (full protocol in `install/AGENT.md`):
 3. Report the resulting configuration: the five-phase report, the persisted `project:` block, the verification plan, the lifecycle (`paw lifecycle show`).
 
 The machine-readable statements of this process live in the `install/` folder of this repository — `install/manifest.yaml` (package metadata + install command), `install/install.yaml` (the contract as data: phases, writes, nevers), `install/AGENT.md` (the protocol an external agent follows), `install/instructions.md` (the human-facing guide). Documentation: [Agent Bootstrap](docs/bootstrap.md).
+
+For the complete AI-agent contract — the full **install → set up → complete** sequence, the long-run operating playbook (finish line, stop conditions, evidence-checked subagents, a durable task file, self-review, mark-what-you-couldn't-confirm), the verification gates, failure handling, and the final report — see the [PAW Installation Runbook](docs/paw-install-runbook.md).
 
 ## What an install never does
 
