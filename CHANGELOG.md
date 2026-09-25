@@ -7,11 +7,13 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 The repository is specification-first: until the first implementation release,
 the project stays on 0.x and everything may change.
 
-## [Unreleased]
+## [0.5.2] - 2026-09-25
+
+The runbook now ships where agents actually read: the canonical spec, the npm landing page, and Getting Started all point to `docs/paw-install-runbook.md`, the complete install → set up → complete contract. Also hardens the release pipeline's registry verification so a successful publish is never reported as a failure. Documentation and release-metadata only: no code, contracts, or CLI behavior changed.
 
 ### Added
 
-- **Runbook pointers on every install surface** — the canonical spec (`README.md`) is the first thing an agent reads, and the npm landing page (`packages/cli/npm-README.md`) is the first thing an agent reads after installing. Neither referenced the new `docs/paw-install-runbook.md`. Both now point to it as the complete **install → set up → complete** contract, and the runbook is linked in the npm page's Links section. The spec reference is added inside the existing top-level quickstart and the init-process section (spec section 152) — no new numbered section, so the spec section count stays 153 (`PAW003`).
+- **Runbook pointers on every install surface** — the canonical spec (`README.md`) is the first thing an agent reads, and the npm landing page (`packages/cli/npm-README.md`) is the first thing an agent reads after installing. Neither referenced the new `docs/paw-install-runbook.md`. Both now point to it as the complete **install → set up → complete** contract, and the runbook is linked in the npm page's Links section and in `docs/getting-started.md`. The spec reference is added inside the existing top-level quickstart and the init-process section (spec section 152) — no new numbered section, so the spec section count stays 153 (`PAW003`).
 
 ### Fixed
 

@@ -54,7 +54,7 @@ const shellService = defineService<ShellProvider>({ id: "shell", contractVersion
  * string is what users and scripts compare).
  */
 declare const __PAW_CLI_VERSION__: string | undefined;
-const CLI_VERSION = typeof __PAW_CLI_VERSION__ !== "undefined" ? __PAW_CLI_VERSION__ : "0.5.1";
+const CLI_VERSION = typeof __PAW_CLI_VERSION__ !== "undefined" ? __PAW_CLI_VERSION__ : "0.5.2";
 const WORKSPACE_API_VERSION = "1.0.0";
 
 interface ParsedArgs {

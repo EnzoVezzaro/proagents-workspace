@@ -6,7 +6,7 @@
 # CLI version (the npm package is the installer).
 
 name: proagents-workspace
-version: 0.5.1
+version: 0.5.2
 type: workspace-framework
 description: >-
   The convention-first workstation for AI coding agents: one CLI (`paw`)

@@ -1,6 +1,6 @@
 {
   "name": "@proagents/plugin-runtime-local",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "description": "Local runtime capability provider for ProAgents Workspace — the zero-cloud default path.",
   "license": "MIT",
   "type": "module",

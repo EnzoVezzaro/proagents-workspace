@@ -1,6 +1,6 @@
 {
   "name": "@proagents/plugin-context-acc",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "description": "ACC context capability provider for ProAgents Workspace — indexes .acc/ context packs.",
   "license": "MIT",
   "type": "module",

@@ -1,6 +1,6 @@
 {
   "name": "@proagents/plugin-runtime-docker",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "description": "Docker runtime capability provider for ProAgents Workspace — isolated container workspaces.",
   "license": "MIT",
   "type": "module",
