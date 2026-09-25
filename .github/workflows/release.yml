@@ -134,16 +134,19 @@ jobs:
       - name: Verify the registry
         run: |
           PKG_VERSION="${GITHUB_REF_NAME#v}"
-          for attempt in 1 2 3 4 5 6; do
+          # npm Trusted Publishing can take several minutes to propagate to
+          # every read replica; poll generously (24 x 30s = 12 min) so a
+          # successful publish is not reported as a failure.
+          for attempt in $(seq 1 24); do
             LIVE=$(npm view "@reposell/proagents-workspace@$PKG_VERSION" version --prefer-online 2>/dev/null || true)
             if [ "$LIVE" = "$PKG_VERSION" ]; then
-              echo "registry confirms $PKG_VERSION"
+              echo "registry confirms $PKG_VERSION after $((attempt - 1)) waits"
               exit 0
             fi
-            echo "attempt $attempt: registry not yet showing $PKG_VERSION, waiting…"
-            sleep 45
+            echo "attempt $attempt/24: registry not yet showing $PKG_VERSION, waiting 30s…"
+            sleep 30
           done
-          echo "::error::registry never showed $PKG_VERSION — investigate the publish"
+          echo "::error::registry never showed $PKG_VERSION after 12 minutes — investigate the publish"
           exit 1
 
       - name: Cold-install smoke

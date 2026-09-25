@@ -7,6 +7,12 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 The repository is specification-first: until the first implementation release,
 the project stays on 0.x and everything may change.
 
+## [Unreleased]
+
+### Fixed
+
+- **Release workflow registry verification** (`.github/workflows/release.yml`) — the 0.5.1 release run published successfully to npm but the post-publish "Verify the registry" step reported failure, because it polled 6×45s (~4.5 min) while npm Trusted Publishing took longer to propagate to the runner's read replica. The publish was confirmed healthy by a cold install; the poll is widened to 24×30s (12 min) so future releases are not falsely reported as failed.
+
 ## [0.5.1] - 2026-09-25
 
 The agent-experience patch: the five-phase install contract (spec section 152) now ships with a complete runbook that tells an AI agent how to install, set up, and **complete** a ProAgents Workspace — and how to steer, self-review, and report the run honestly. Documentation only: no code, contracts, or CLI behavior changed.
@@ -20,6 +26,10 @@ The agent-experience patch: the five-phase install contract (spec section 152) n
 - All workspace packages bumped 0.5.0 → 0.5.1; `install/manifest.yaml` (spec section 152) carries the released version, keeping the `paw check` coherence gates (PAW001 manifest skew, PAW002 package disagreement, PAW008 changelog gap) satisfied. The `paw --version` repo-build fallback literal (`packages/cli/src/index.ts`) bumped 0.5.0 → 0.5.1 so the source build reports the released version (the published bundle injects the real version via esbuild `--define`).
 - `docs/index.md` indexes the runbook; `docs/bootstrap.md` cross-links it as the complete install-and-complete contract.
 - `docs/AGENTS.md` documentation contract: corrected the stale spec-section count (140 → 153, matching the canonical `README.md`), dropped the hardcoded document count that drifted with every new doc, and completed the getting-started document list (bootstrap, runbook, health-checks, workspace-implementation).
+
+### Fixed
+
+- **Release workflow coherence check** (`.github/workflows/release.yml`) — the version-coherence step matched the changelog heading and manifest version with `grep -q "## [$PKG_VERSION]"` and `grep -q "^version: $PKG_VERSION"`. In double quotes `[0.5.1]` is a bracket character class, not a literal, so the pattern never matched the real `## [0.5.1]` heading and the check failed for **every** version. The automated pipeline had never completed a run (v0.5.0 predates the workflow), so the bug stayed latent. Both checks now use `grep -qF` (fixed-string).
 
 ## [0.5.0] - 2026-09-24
 
