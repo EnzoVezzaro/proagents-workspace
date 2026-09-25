@@ -9,6 +9,10 @@ the project stays on 0.x and everything may change.
 
 ## [Unreleased]
 
+### Added
+
+- **Runbook pointers on every install surface** — the canonical spec (`README.md`) is the first thing an agent reads, and the npm landing page (`packages/cli/npm-README.md`) is the first thing an agent reads after installing. Neither referenced the new `docs/paw-install-runbook.md`. Both now point to it as the complete **install → set up → complete** contract, and the runbook is linked in the npm page's Links section. The spec reference is added inside the existing top-level quickstart and the init-process section (spec section 152) — no new numbered section, so the spec section count stays 153 (`PAW003`).
+
 ### Fixed
 
 - **Release workflow registry verification** (`.github/workflows/release.yml`) — the 0.5.1 release run published successfully to npm but the post-publish "Verify the registry" step reported failure, because it polled 6×45s (~4.5 min) while npm Trusted Publishing took longer to propagate to the runner's read replica. The publish was confirmed healthy by a cold install; the poll is widened to 24×30s (12 min) so future releases are not falsely reported as failed.

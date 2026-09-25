@@ -20,6 +20,8 @@ Setup https://github.com/EnzoVezzaro/proagents-workspace for @README.md (project
 
 The agent follows the [bootstrap protocol](https://github.com/EnzoVezzaro/proagents-workspace/blob/main/install/AGENT.md) and runs `npx @reposell/proagents-workspace@latest install README.md` — the five-phase bootstrap: inspect → understand → initialize → configure → verify.
 
+For the complete **install → set up → complete** contract — a ready-to-paste start prompt, the long-run operating playbook (finish line, stop conditions, evidence-checked subagents, self-review), the verification gates, failure handling, and the final report — see the [PAW Installation Runbook](https://github.com/EnzoVezzaro/proagents-workspace/blob/main/docs/paw-install-runbook.md).
+
 **No runtime required. No cloud account required. No desktop application required.**
 
 Works with Codex, Claude Code, OpenCode, Gemini CLI, DeepSeek Harness, and custom agents — the Workspace improves the environment around your agent; it never replaces it.
@@ -48,6 +50,7 @@ Works with Codex, Claude Code, OpenCode, Gemini CLI, DeepSeek Harness, and custo
 ## Links
 
 - [Documentation](https://github.com/EnzoVezzaro/proagents-workspace/tree/main/docs)
+- [PAW Installation Runbook](https://github.com/EnzoVezzaro/proagents-workspace/blob/main/docs/paw-install-runbook.md) — the complete install-to-complete contract for an AI agent
 - [Changelog](https://github.com/EnzoVezzaro/proagents-workspace/blob/main/CHANGELOG.md)
 - [Contributing / source](https://github.com/EnzoVezzaro/proagents-workspace)
 

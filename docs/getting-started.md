@@ -119,6 +119,7 @@ Runtimes: `local` (default, host-level — NOT a sandbox), `docker`, `e2b`.
 
 ## Next Steps
 
+- [PAW Installation Runbook](paw-install-runbook.md) — the complete install → set up → complete contract for an AI agent (start prompt, long-run playbook, gates, self-review, report)
 - [Configuration](configuration.md) — minimal config, precedence, full reference
 - [CLI Reference](cli-reference.md) — every command
 - [Verification](verification.md) — the verification loop
