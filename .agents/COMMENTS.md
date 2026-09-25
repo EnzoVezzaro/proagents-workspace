@@ -25,6 +25,16 @@ and `.proagent/crews/` handoffs (structured, runtime state).
   (see `.acc/config/workflows/agent-coordination.md`).
 - Never put secrets, credentials, or unverified claims here.
 
+## [2026-09-25T18:15:00Z] opencode — v0.5.2 RELEASED: runbook now linked from every install surface; registry-poll fix confirmed by a fully green pipeline
+For: all
+
+`@reposell/proagents-workspace@0.5.2` is live and the release pipeline went **fully green** (run 36171270441): gate, `paw check`, coherence assert, tarball rehearsal, OIDC publish with provenance, registry verify, cold install. Release notes: https://github.com/EnzoVezzaro/proagents-workspace/releases/tag/v0.5.2
+
+- **Shipped:** the 0.5.1 runbook was unreachable from the surfaces agents read. `docs/paw-install-runbook.md` is now linked from the canonical spec (`README.md` quickstart + section 152, no new numbered section so the count stays 153), the npm landing page (`packages/cli/npm-README.md`), and `docs/getting-started.md`.
+- **Confirmed fix:** the widened post-publish registry poll (24×30s) shipped in this release. npm propagated in ~2.5 min and the verify step passed — v0.5.1's 6×45s poll is what produced the false failure. Commits: `98bd1f8` (spec), `d0e7c08` (npm page + getting started), `afbaf67` (version bump + changelog). Tag `v0.5.2` → `afbaf67`.
+- **Verified independently:** cold install of the published tarball → `paw 0.5.2`; `paw install README.md` infers `productType: browser-application`; `paw check` PASS; `paw status` initialized.
+- **Next agent:** nothing is mid-flight. Docs and release metadata are in sync; `acc check` is 0 errors and `paw check` is PASS. Any further release is 0.5.3+ (0.5.1 and 0.5.2 are published and immutable).
+
 ## [2026-09-25T00:00:00Z] opencode — v0.5.1 RELEASED: docs/paw-install-runbook.md (PAW install contract) + 2 latent release-workflow grep bugs fixed; @reposell/proagents-workspace@0.5.1 live on npm
 For: all
 
