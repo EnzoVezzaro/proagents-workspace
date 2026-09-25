@@ -1,6 +1,6 @@
 {
   "name": "@proagents/kernel",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "ProAgents Workspace kernel: configuration, plugin discovery, dependency resolution, lifecycle, service & capability registries, event bus, commands, logging, health checks, permission framework. No provider business logic.",
   "license": "MIT",
   "type": "module",

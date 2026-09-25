@@ -7,6 +7,20 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 The repository is specification-first: until the first implementation release,
 the project stays on 0.x and everything may change.
 
+## [0.5.1] - 2026-09-25
+
+The agent-experience patch: the five-phase install contract (spec section 152) now ships with a complete runbook that tells an AI agent how to install, set up, and **complete** a ProAgents Workspace — and how to steer, self-review, and report the run honestly. Documentation only: no code, contracts, or CLI behavior changed.
+
+### Added
+
+- **PAW Installation Runbook** (`docs/paw-install-runbook.md`) — the agent-facing execution contract for a Workspace install, structured as the three verbs the install actually is: **install** (the five-phase contract inspect → understand → initialize → configure → verify; the `never` list — metadata-only, idempotent, never touches application code, manifests, or git state; exit codes `0`/`1`; `INTENT_SOURCE_UNREADABLE`), **set up** (verification configuration, lifecycle, agent tiers, and the optional progressive integrations: ACC-aware research, isolated runtimes, checkpoint plans, headless CI, and reproducibility via `workspace export` → `workspace create --from`), and **complete** (the install/status/doctor/check/verify/diff gates plus a runtime smoke test that is explicitly marked *unverified* when no harness is available). Folds in the operating discipline an agent needs to finish a long run unattended and be checked afterward: hand over the whole task with a finish line and explicit stop conditions, no "think carefully" filler, the keep-going-vs-stop-and-ask rule, subagent fan-out with per-result evidence checks, a durable task file that survives context compaction, an independent review pass before a human reviews, and marking what could not be confirmed. Product boundaries are stated up front — Workspace is **WHERE** (this runbook installs only `paw`; ProAgents = WHO and ACC = WHAT are separate installs). Grounded in `install/install.yaml` and cross-linked from `docs/bootstrap.md`, `docs/index.md`, and the rest of `docs/`.
+
+### Changed
+
+- All workspace packages bumped 0.5.0 → 0.5.1; `install/manifest.yaml` (spec section 152) carries the released version, keeping the `paw check` coherence gates (PAW001 manifest skew, PAW002 package disagreement, PAW008 changelog gap) satisfied. The `paw --version` repo-build fallback literal (`packages/cli/src/index.ts`) bumped 0.5.0 → 0.5.1 so the source build reports the released version (the published bundle injects the real version via esbuild `--define`).
+- `docs/index.md` indexes the runbook; `docs/bootstrap.md` cross-links it as the complete install-and-complete contract.
+- `docs/AGENTS.md` documentation contract: corrected the stale spec-section count (140 → 153, matching the canonical `README.md`), dropped the hardcoded document count that drifted with every new doc, and completed the getting-started document list (bootstrap, runbook, health-checks, workspace-implementation).
+
 ## [0.5.0] - 2026-09-24
 
 The file-driven bootstrap release: `paw init README.md` / `paw install <file>` start the workspace from the project's own words — the `@README.md` semantic contract made literal. Includes the first public dogfood of the published installer against a real foreign repository (ProAgents itself), which verified every preservation guarantee byte-for-byte and surfaced two honesty fixes shipped here.

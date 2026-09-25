@@ -1,6 +1,6 @@
 {
   "name": "@proagents/plugin-agent-dsh",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "DeepSeek Harness agent capability provider for ProAgents Workspace — drives the real dsh engine headlessly per workspace with NDJSON event observation.",
   "license": "MIT",
   "type": "module",

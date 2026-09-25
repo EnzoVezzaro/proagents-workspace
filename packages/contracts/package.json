@@ -1,6 +1,6 @@
 {
   "name": "@proagents/contracts",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "Versioned capability contracts, schemas and event types for ProAgents Workspace. No runtime logic — contracts only.",
   "license": "MIT",
   "type": "module",

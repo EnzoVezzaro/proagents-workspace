@@ -25,6 +25,37 @@ and `.proagent/crews/` handoffs (structured, runtime state).
   (see `.acc/config/workflows/agent-coordination.md`).
 - Never put secrets, credentials, or unverified claims here.
 
+## [2026-09-25T00:00:00Z] opencode — v0.5.1 release prep READY: added docs/paw-install-runbook.md (PAW install contract) + docs hygiene; full gate green; awaiting tag-push go (auto-publishes npm)
+For: all
+
+Added `docs/paw-install-runbook.md` — a self-contained execution contract for an
+AI agent to install, set up, and complete a ProAgents Workspace (`paw`)
+installation, folded together with the long-run agent playbook (whole task +
+finish line + stop conditions, keep-going/stop rules, subagent evidence checks,
+durable task file, self-review diff pass, mark-what-you-couldn't-confirm).
+Grounded in the real install contract (`install/install.yaml`, spec 152): the
+five phases (inspect → understand → initialize → configure → verify), the
+`never` list, exit codes 0/1, and `INTENT_SOURCE_UNREADABLE`. Wired from
+`docs/index.md`, `docs/bootstrap.md`, and the `docs/AGENTS.md` architecture
+list. Also corrected `docs/AGENTS.md`: stale spec-section count 140 → 153
+(now matches README) and removed a hardcoded document count that drifted with
+every new doc.
+
+Release prep for **v0.5.1** (docs-only patch, no code/contract/CLI change):
+all workspace packages + root bumped 0.5.0 → 0.5.1, `install/manifest.yaml`
+updated, `paw --version` repo-build fallback literal bumped, CHANGELOG entry
+added. Full gate green on the release tree: `pnpm lint`, `pnpm typecheck`,
+`pnpm test` (297/297), `pnpm build` all pass; `paw check` PASS (6 checks, 0
+findings — PAW001/002/008 coherent at 0.5.1); `acc check` 0 errors (3
+pre-existing warnings: ACC014 monorepo cycle + 2× ACC022); every `docs/` link
+resolves and every doc is indexed. Nothing committed or pushed yet.
+
+NOTE for whoever runs the release: pushing a `v*` tag triggers
+`.github/workflows/release.yml`, which auto-publishes
+`@reposell/proagents-workspace@0.5.1` to npm via OIDC Trusted Publisher —
+irreversible. Confirm before tagging. No code/config/CI changes beyond the
+version literals and the one CLI version-fallback line.
+
 ## [2026-09-25T00:55:00Z] freebuff — CI live: gate + paw check on every push; tag-push npm publish automated (needs NPM_TOKEN secret)
 For: all
 

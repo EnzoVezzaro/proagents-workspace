@@ -1,6 +1,6 @@
 {
   "name": "@proagents/plugin-gate-adversarial",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "adversarial gate plugin for ProAgents Workspace checkpoints (spec section 150)",
   "license": "MIT",
   "type": "module",
