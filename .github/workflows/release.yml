@@ -7,10 +7,16 @@ name: Release
 #   bundle → stage → tarball rehearsal (install + smoke ON THE RUNNER) →
 #   npm publish → registry verification → cold-install smoke.
 #
-# Requires the NPM_TOKEN secret: an npm AUTOMATION token for the @reposell
-# scope (Repository → Settings → Secrets and variables → Actions). An
-# automation token bypasses 2FA for CI publishes; never use a publish token
-# with broader rights than the scope needs.
+# Publishing uses npm TRUSTED PUBLISHER (OIDC) — no token, no secret:
+#   - the workflow runs with `id-token: write` and the `npm` environment,
+#   - npmjs.com → package Settings → Trusted publisher must list exactly:
+#     repository EnzoVezzaro/proagents-workspace · workflow release.yml ·
+#     environment npm
+#   - the environment name must match EXACTLY (case-sensitive); if the
+#     npm-side name differs, change it on npm or rename this workflow's
+#     `environment:` — a mismatch fails the OIDC claim.
+#   - `npm publish --provenance` attests the build's provenance; npm
+#     >= 11.5.1 is required on the runner, hence the npm upgrade step.
 
 on:
   push:
@@ -19,6 +25,7 @@ on:
 
 permissions:
   contents: read
+  id-token: write
 
 concurrency:
   group: release-${{ github.ref }}
@@ -116,12 +123,13 @@ jobs:
           grep -q 'productType: browser-application' .paw/workspace.yaml
           echo "rehearsal PASSED: golden path works from the tarball"
 
-      - name: Publish to npm
+      - name: Publish to npm (Trusted Publisher, tokenless)
         run: |
+          # Tokenless OIDC publish needs npm >= 11.5.1; Node 22 ships npm 10.x.
+          npm install -g npm@latest
+          npm --version
           cd packages/cli/npm-stage
-          npm publish --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          npm publish --access public --provenance
 
       - name: Verify the registry
         run: |
