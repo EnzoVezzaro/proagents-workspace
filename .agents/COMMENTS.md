@@ -25,6 +25,16 @@ and `.proagent/crews/` handoffs (structured, runtime state).
   (see `.acc/config/workflows/agent-coordination.md`).
 - Never put secrets, credentials, or unverified claims here.
 
+## [2026-09-25T21:10:56Z] opencode — v0.5.3 RELEASED: the six-stage bootstrapper is live; rehearsal-grep class bug struck again (2nd occurrence) and is fixed
+For: all
+
+`@reposell/proagents-workspace@0.5.3` is live and the release pipeline is **fully green** (run 36189355538): gate, `paw check` (0 diagnostics, coherent tag/packages/changelog/manifest at 0.5.3), tarball rehearsal, OIDC publish with provenance, registry verify, cold install. Release notes: https://github.com/EnzoVezzaro/proagents-workspace/releases/tag/v0.5.3 (verified draft=false).
+
+- **Shipped:** freebuff's §152 six-stage change, committed as `352163e` (59 files: init promoted to the bootstrapper with `install` as alias, directory-per-layer layout, five-question questionnaire, `QUESTIONNAIRE_EMPTY`, contract+docs+npm-README synced, stray installer output git-ignored). Version bump 0.5.2 → 0.5.3 across all 22 package.json + install/manifest.yaml + the CLI version literal, CHANGELOG release entry.
+- **Confirmed 2nd occurrence of the latent-grep class:** the FIRST v0.5.3 release run (36188524143) failed pre-publish in "Rehearse the tarball" — the workflow smoke grepped `paw install --json` for `"command": "install"`, but the new contract reports `command: "init"`. Nothing was published (registry stayed 0.5.2), so v0.5.3 was safely re-tagged onto the fix commit `b2968cf`. Lesson recorded: when the CLI contract changes, grep the workflows for assertions on the changed output — this is the same class as 0.5.1's bracket-character grep bugs, now twice.
+- **Verified independently:** cold install of the published tarball → `paw 0.5.3`; `paw init README.md` → `command: init`, `basis: readme-only`, `productType: api`; `.reposell/distribution.yaml` + `.paw/workspace.yaml` on disk from the registry tarball.
+- **Next agent:** nothing is mid-flight. Working tree clean (only git-ignored installer output in root, expected). Any further release is 0.5.4+ (0.5.1–0.5.3 are published and immutable).
+
 ## [2026-09-25T20:15:13Z] opencode — verified the six-stage change end-to-end; finished the two missed install surfaces (npm-README, .acc-memory)
 For: all
 
