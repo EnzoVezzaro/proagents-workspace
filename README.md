@@ -5326,3 +5326,52 @@ repo/
 ```
 
 `.agents/` in the Workspace's own repository is the cross-agent comment channel; the Workspace never writes to `.agents/` in a target repository (section 146 hygiene: agent-owned files stay agent-owned). Inference is additive and honest: detection from manifests wins, the README fills what manifests cannot say, and every claim in the report names the file it came from.
+
+# Self-diagnostics: paw check (section 153)
+
+The framework applies its own medicine: the same regime the ACC framework applies to repositories (`acc check`, the ACC0xx registry) applied to the Workspace's own configuration artifacts. Configuration drift — the class of defect where docs, manifests, and code silently disagree — is detected with stable codes, not discovered by embarrassment.
+
+```bash
+paw check            # framework + workspace checks; human-readable
+paw check --json     # machine-readable (agent-first)
+```
+
+Exit code 1 on any error-severity finding; warnings do not fail a gate. `paw check` runs inside the framework repository (full checks), inside an initialized target workspace (workspace checks), or anywhere else (reports `PAW012` honestly).
+
+## The PAW0xx registry
+
+Diagnostic codes are a stability contract — never reused, never retyped (same rule as error codes, section 99):
+
+| Code | Severity | Catches |
+|------|----------|---------|
+| `PAW001` | error | `install/manifest.yaml` version ≠ released CLI version |
+| `PAW002` | error | workspace package versions disagree with each other |
+| `PAW003` | error | `AGENTS.md` section-count claim ≠ actual spec sections in `README.md` |
+| `PAW004` | warning | `templates/AGENTS.md` and the SDK generator have drifted apart |
+| `PAW005` | error | a bootstrap contract file (`install/`, `templates/`) is missing |
+| `PAW006` | error | `.paw/workspace.yaml` fails schema validation |
+| `PAW007` | warning | a spec citation points beyond the actual spec length |
+| `PAW008` | error | the current version has no `CHANGELOG.md` entry |
+| `PAW009` | error | a documented command is missing from `docs/cli-reference.md` |
+| `PAW010` | warning | `.paw/state/lifecycle-state.json` is not readable JSON |
+| `PAW011` | warning | nothing was checkable in this scope |
+
+Every diagnostic carries: the stable code, a severity, a message, **evidence** (what was compared, what was found), and a **fix suggestion**. A diagnostic without a fix suggestion is a bug.
+
+## Product boundaries
+
+The three systems in this ecosystem each police their own domain — no cross-dependency:
+
+| System | Command | Checks |
+|--------|---------|--------|
+| ACC | `acc check` | context/contract integrity (the ACC0xx registry) |
+| ProAgents | `proagent validate --spec` | its agent-environment spec and lock |
+| Workspace | `paw check` | the Workspace's own artifacts (the PAW0xx registry) |
+
+`paw check` never reads ACC (`.acc/`) or ProAgents (`proagents.yaml`/`proagents.lock`) files: a cross-product check would couple three products' release cycles together. Its framework marker is Workspace-owned (`install/manifest.yaml`).
+
+## Rules
+
+- `paw check` never mutates anything — it reports; `paw install`/`paw init` repair.
+- Framework checks run when the walked-up root declares `proagents.yaml`; workspace checks run when `.paw/` exists. The reported scope reflects what actually ran.
+- The release checklist (`.acc/config/workflows/release.md`) treats `paw check` as a pre-publish blocking step — the registry exists precisely to make release drift impossible to miss.

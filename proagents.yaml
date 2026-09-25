@@ -7,14 +7,15 @@ project:
   name: proagents-workspace
   description: >-
     The convention-first workspace for AI coding agents — a lightweight,
-    local-first developer CLI around an existing repository (paw init /
-    status / research / verify), with isolated runtimes and lifecycle as
-    progressive opt-ins. There is no desktop application: the terminal is
-    the interface. README.md is the canonical product spec (sections
-    148–149 pin the product model and research convergence); docs/ is the
-    distilled documentation. V1 implementation (kernel, paw CLI, SDK,
-    bundled plugins, verification) has landed; the agent environment spec
-    sections 134/139 still govern kernel purity and scope.
+    local-first developer CLI around an existing repository (paw install /
+    init / status / research / verify / lifecycle / check), with isolated
+    runtimes as progressive opt-ins. There is no desktop application: the
+    terminal is the interface. README.md is the canonical product spec
+    (sections 148-152 pin convention-first, research, checkpoints/gates,
+    the canonical lifecycle, and the agent bootstrap); docs/ is the
+    distilled documentation. V1 implementation has landed (kernel, paw
+    CLI, SDK, bundled plugins, verification); spec sections 134/139 still
+    govern kernel purity and scope.
 
 environment:
   # Professions this job needs — mirrors .acc/config/agents/ (the ACC expertise map):

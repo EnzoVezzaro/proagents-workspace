@@ -1,6 +1,6 @@
 {
   "name": "@proagents/plugin-lifecycle-web",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Web development lifecycle definition plugin for ProAgents Workspace — contributes the web-development lifecycle (understand → plan → implement → unit/browser test → review → ship) as pure data.",
   "license": "MIT",
   "type": "module",

@@ -167,7 +167,7 @@ export async function installWorkspace(
         init.verification.checks.length > 0
           ? `verification: ${init.verification.checks.map((c) => c.command).join(" → ")}`
           : "verification: none detected — add commands to .paw/workspace.yaml",
-        `lifecycle: ${flow.stages.length}-phase canonical flow (paw lifecycle show)`,
+        `lifecycle: canonical flow — \`paw lifecycle show\` prints the effective phases (stage plugins may contribute more)`,
       ],
     },
     {

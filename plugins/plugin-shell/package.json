@@ -1,6 +1,6 @@
 {
   "name": "@proagents/plugin-shell",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Shell capability provider for ProAgents Workspace — permission-checked command execution with before-execution protection.",
   "license": "MIT",
   "type": "module",

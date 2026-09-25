@@ -252,7 +252,8 @@ paw plugin inspect
 ## Diagnostics
 
 ```bash
-paw doctor
+paw doctor           # provider/component health (what is available)
+paw check            # configuration self-diagnostics (what has drifted) [--json]
 ```
 
 Optional components (ACC, Docker, E2B) are marked optional — they never appear as failures. `paw doctor` diagnoses:
@@ -303,6 +304,15 @@ Verification
 ```
 
 Every provider must expose health, and every error must be actionable.
+
+## Check Command (spec section 153)
+
+```bash
+paw check            # framework + workspace drift checks, human-readable
+paw check --json     # machine-readable diagnostics
+```
+
+`paw check` is the framework policing itself: stable `PAW0xx` codes for configuration drift — manifest/template version skew, spec-count drift, missing contract files, changelog gaps, cli-reference omissions, invalid `.paw/` config, unreadable lifecycle state. Every diagnostic carries code, severity, message, evidence, and a fix suggestion; exit 1 on any error-severity finding. Never mutates anything. See [Self-Diagnostics](health-checks.md).
 
 ## Global Options
 

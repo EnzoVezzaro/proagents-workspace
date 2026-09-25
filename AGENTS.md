@@ -19,7 +19,7 @@ Owner: proagents-workspace maintainers
 
 ## Inputs
 
-- `README.md` — the canonical product specification (152 numbered sections).
+- `README.md` — the canonical product specification (153 numbered sections).
 - `DISTRIBUTION.md` — the protection & distribution architecture supplement.
 - Community feedback, issues, and ecosystem requirements (ProAgents, ACC, Repo Shield, reposell).
 

@@ -37,6 +37,7 @@ Stable-contract checklist before publishing a ProAgents Workspace documentation 
 ## Validation (blocking)
 
 - [ ] `acc check` passes with 0 errors on the repository.
+- [ ] `paw check` passes with 0 error-severity findings (spec section 153) — the framework's own drift gate: manifest/template/spec/version/changelog/cli-reference coherence.
 - [ ] `acc graph docs` shows the expected docs boundary with no new diagnostics.
 - [ ] All `AGENTS.md` contracts match the current repository state (no ACC010/ACC072 diagnostics).
 

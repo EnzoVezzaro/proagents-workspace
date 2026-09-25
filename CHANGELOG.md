@@ -7,11 +7,19 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 The repository is specification-first: until the first implementation release,
 the project stays on 0.x and everything may change.
 
-## [Unreleased]
+## [0.5.0] - 2026-09-24
+
+The file-driven bootstrap release: `paw init README.md` / `paw install <file>` start the workspace from the project's own words — the `@README.md` semantic contract made literal. Includes the first public dogfood of the published installer against a real foreign repository (ProAgents itself), which verified every preservation guarantee byte-for-byte and surfaced two honesty fixes shipped here.
 
 ### Added
 
+- **Self-diagnostics: `paw check` (spec section 153)** — the framework policing itself: the ACC-check analogue applied to the Workspace's own configuration artifacts. Stable `PAW0xx` diagnostic codes (a versioning contract, `packages/contracts/src/diagnostics.ts`) catch exactly the drift class that shipped in past releases: manifest/CLI version skew (PAW001), package version disagreement (PAW002), AGENTS.md spec-count drift (PAW003), template/generator divergence (PAW004), missing bootstrap contract files (PAW005), invalid `.paw/` config (PAW006), stale section citations (PAW007), changelog gaps (PAW008), cli-reference omissions (PAW009), unreadable lifecycle state (PAW010), and an honest `PAW011` when nothing is checkable. Product boundaries held: `paw check` reads NO ACC or ProAgents files (`.acc/`, `proagents.yaml`/`.lock`) — those systems diagnose themselves (`acc check`, `proagent validate --spec`); the framework marker is Workspace-owned (`install/manifest.yaml`). Every diagnostic carries code, severity, message, evidence, and a fix suggestion; exit 1 on error-severity findings; `--json` for agents; never mutates anything. Docs: `docs/health-checks.md`, README spec section 153; `paw check` added as a blocking release-checklist step. 10 new SDK tests with injected-defect fixtures.
 - **File-driven init/install — the `@README.md` contract made literal (spec sections 148/152)** — both entrypoints now accept a source file: `paw init README.md` / `paw install BRIEF.md` start the workspace from the project's own words. The inferred intent (product type, domains, skills, provenance) is persisted into the generated `.paw/workspace.yaml` as the informational `project:` block (named sources, edit freely; manifest evidence always included in `derivedFrom`). New: `projectIntentSchema` + `project` in the workspace config schema, structured error `INTENT_SOURCE_UNREADABLE` (an unreadable source never silently degrades), pure `inferIntentFromText` shared by init/install (plural-aware dictionaries), `findReadmeText`, SDK `InitResult.intent` / `InstallPlan.from`; the generated `AGENTS.md` gains product-type/domains lines. Backward compatible: without a file, behavior is unchanged; existing configs are untouched.
+- **Init process documented across the agent-facing surfaces** — root `AGENTS.md` operating instruction #10 + Workflows pointer, README §152 "The init process" (context→command table + 3-step agent process), `install/AGENT.md` leading with the file-driven init and the contract-folder map, `install/instructions.md` path table, and the npm README quickstart now leads with `paw init README.md` + the Setup-prompt UX.
+
+### Changed
+
+- Install-report honesty (dogfood findings): the report no longer hardcodes a phase count — it prints the exact effective flow length (canonical + stage-plugin contributions) via `paw lifecycle show`, and the SDK note defers to it.
 
 ## [0.4.0] - 2026-09-24
 

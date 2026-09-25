@@ -4,6 +4,7 @@ export * from "./conventions.js";
 export * from "./simple-yaml.js";
 export * from "./research.js";
 export * from "./install.js";
+export * from "./check.js";
 
 // Re-export the full contract + kernel surface so plugin authors depend on
 // this single package (the documented dependency of the plugin template).

@@ -22,6 +22,7 @@ import { WorkspaceClient, WorkspaceError, type WorkspaceClientOptions } from "@p
 import { defineService, type ContextProvider, type ShellProvider } from "@proagents/contracts";
 import { accContextPlugin } from "@proagents/plugin-context-acc";
 import { bundledPlugins } from "./plugins.js";
+import { effectiveFlow } from "./flow.js";
 import {
   detectProject,
   discoverEnvironment,
@@ -29,6 +30,7 @@ import {
   inferVerification,
   initWorkspace,
   installWorkspace,
+  checkWorkspace,
   isInitialized,
   loadConfig,
   pawDirFor,
@@ -52,7 +54,7 @@ const shellService = defineService<ShellProvider>({ id: "shell", contractVersion
  * string is what users and scripts compare).
  */
 declare const __PAW_CLI_VERSION__: string | undefined;
-const CLI_VERSION = typeof __PAW_CLI_VERSION__ !== "undefined" ? __PAW_CLI_VERSION__ : "0.4.0";
+const CLI_VERSION = typeof __PAW_CLI_VERSION__ !== "undefined" ? __PAW_CLI_VERSION__ : "0.5.0";
 const WORKSPACE_API_VERSION = "1.0.0";
 
 interface ParsedArgs {
@@ -253,6 +255,35 @@ function renderStatus(projectRoot: string, parsed: ParsedArgs): Promise<number> 
  * external coding agent can run it verbatim; the output is the report the
  * agent relays back to the human ("report the resulting configuration").
  */
+/**
+ * `paw check` (spec section 153): the framework checks itself — drift,
+ * stale artifacts, broken references — with stable PAW0xx codes, evidence,
+ * and fix suggestions (the ACC-check analogue). Exit 1 on any error-severity
+ * finding; warnings do not fail the gate.
+ */
+async function runCheck(projectRoot: string, parsed: ParsedArgs): Promise<number> {
+  const result = await checkWorkspace(projectRoot);
+  if (parsed.json) {
+    process.stdout.write(`${JSON.stringify({ command: "check", ...result }, null, 2)}\n`);
+  } else {
+    process.stdout.write(`Workspace self-check (spec section 153) — scope: ${result.scope}, version ${result.version}\n\n`);
+    if (result.diagnostics.length === 0) {
+      process.stdout.write(`✓ ${result.checksRun} checks ran, no findings\n`);
+    }
+    for (const d of result.diagnostics) {
+      const mark = d.severity === "error" ? "✗" : d.severity === "warning" ? "▲" : "·";
+      process.stdout.write(`${mark} ${d.code} ${d.severity}: ${d.message}\n`);
+      if (d.file !== undefined) process.stdout.write(`    file: ${d.file}\n`);
+      process.stdout.write(`    evidence: ${d.evidence}\n`);
+      process.stdout.write(`    fix: ${d.suggestion}\n`);
+    }
+    process.stdout.write(
+      `\nResult: ${result.ok ? "PASS" : "FAIL"} — ${result.checksRun} checks, ${result.diagnostics.length} finding(s)\n`,
+    );
+  }
+  return result.ok ? 0 : 1;
+}
+
 async function runInstall(projectRoot: string, parsed: ParsedArgs): Promise<number> {
   // File-driven install (spec 152): `paw install README.md` bootstraps the
   // workspace from that file — the @README.md semantic contract.
@@ -272,6 +303,9 @@ async function runInstall(projectRoot: string, parsed: ParsedArgs): Promise<numb
     for (const note of phase.notes) process.stdout.write(`    ${note}\n`);
   }
   process.stdout.write("\nWorkspace ready.\n");
+  const { config } = await effectiveConfig(projectRoot, parsed);
+  const flow = effectiveFlow(config as Parameters<typeof effectiveFlow>[0]);
+  process.stdout.write("  · " + flow.stages.length + " phases in the effective flow — `paw lifecycle show`\n");
   process.stdout.write("  · `paw status` — the workspace picture\n");
   process.stdout.write("  · `paw verify` — run the verification checks\n");
   process.stdout.write("  · `paw lifecycle show` — the phases this workspace runs\n");
@@ -373,6 +407,7 @@ function usage(): string {
     "  agent list    Detected coding agents and their integration tier",
     "  checkpoint    List/run checkpoint plans with quality gates (spec 150)",
     "  lifecycle     Show/run the canonical workspace lifecycle (spec 151)",
+    "  check         Self-diagnostics: config drift, stale artifacts, broken references (spec 153)",
     "  config show   Effective configuration and where each layer came from",
     "  plugin list   Registered plugins and their capabilities",
     "  service list  Registered capability services",
@@ -410,7 +445,7 @@ async function main(): Promise<number> {
         `${JSON.stringify(
           {
             commands: [
-              "init", "install", "status", "research", "doctor", "verify", "diff", "agent list", "checkpoint",
+              "init", "install", "status", "research", "doctor", "verify", "diff", "agent list", "checkpoint", "check",
               "lifecycle", "config show", "plugin list", "service list", "workspace create",
             ],
           },
@@ -519,6 +554,9 @@ async function main(): Promise<number> {
 
       case "install":
         return await runInstall(projectRoot, parsed);
+
+      case "check":
+        return await runCheck(projectRoot, parsed);
 
       case "verify":
         return await runVerify(projectRoot, parsed);
