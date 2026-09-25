@@ -1,41 +1,60 @@
 # The install contract (spec section 152) — what an install does, as data.
 #
 # Declared so any agent (or human) can verify an install against its
-# contract: what runs, what is written, what is NEVER touched. `paw install`
-# implements exactly this; the contract tests pin it.
+# contract: what runs, what is written, what is NEVER touched. `paw init`
+# (alias: `paw install`) implements exactly this; the contract tests pin it.
 
-version: 1
+version: 2
 
-phases:
-  - id: inspect
-    does: detect languages, runtime, package manager, frameworks, monorepo, coding agents
-    reads: [package.json, pyproject.toml, Cargo.toml, go.mod, Gemfile, composer.json, pom.xml, lockfiles]
+command:
+  # `init` is the canonical bootstrapper; `install` is an alias for the
+  # same machine (both spellings work everywhere below).
+  canonical: init
+  alias: install
 
-  - id: understand
-    does: infer project intent (product type, domains, skills) from README + manifests
-    reads: [README.md]
+stages:
+  - id: resolve
+    does: decide where identity comes from: code AND README, else README, else code, else the questionnaire
+    reads: [package.json, pyproject.toml, Cargo.toml, go.mod, Gemfile, composer.json, pom.xml, lockfiles, README.md]
+    writes: []
+    # An empty repository (no code, no README) reports the five-question
+    # interview; `paw init` asks it inline on a TTY, agents apply answers
+    # headlessly with --answers.
 
-  - id: initialize
-    does: create .paw/ metadata (workspace.yaml, sessions/, artifacts/) when absent
-    writes: [.paw/]
-    preserves: [existing .paw/workspace.yaml]
+  - id: acc
+    does: write the ACC knowledge layer (.acc/config/config.yaml) reflecting DETECTED languages only
+    writes: [.acc/config/config.yaml]
+    preserves: [existing .acc/]
 
-  - id: configure
-    does: write AGENTS.md agent notes when absent; report verification plan and lifecycle
-    writes: [AGENTS.md]
-    preserves: [existing AGENTS.md]
+  - id: shield
+    does: write the Repo Shield policy — what must never happen, before execution
+    writes: [.reposhield/policy.yaml]
+    preserves: [existing .reposhield/]
 
-  - id: verify
-    does: report the verification plan; execute checks only with --verify
-    runs_by_default: nothing
+  - id: proagents
+    does: write WHO operates — one profile per needed profession, a crew wired to ACC context, and the environment config
+    writes: [.proagents/profiles/, .proagents/crew/, .proagents/config.yaml]
+    preserves: [existing .proagents/]
+
+  - id: reposell
+    does: write the distribution posture — consumed, never re-implemented by the workspace
+    writes: [.reposell/distribution.yaml]
+    preserves: [existing .reposell/]
+
+  - id: paw
+    does: create .paw/ LAST — the only artifact that names the protection and distribution providers; write AGENTS.md when absent; report the verification plan
+    writes: [.paw/, AGENTS.md]
+    preserves: [existing .paw/workspace.yaml, existing AGENTS.md]
 
 never:
   - modifies application code
   - rewrites package.json or any manifest
   - changes git state (no add, commit, branch, push)
   - overwrites an existing configuration file
+  - writes into .agents/ (agent-owned namespace)
   - requires an account, a token, or network access beyond npx itself
+  - claims the workspace is ready when the project intent is still unknown
 
 exit_codes:
-  0: install completed (all five phases)
+  0: install completed (all six stages; `needs-input` on resolve is still exit 0)
   1: install failed (structured error on stderr)

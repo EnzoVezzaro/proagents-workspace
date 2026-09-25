@@ -102,7 +102,12 @@ export interface WorkspaceEventMap {
   };
 
   // protection (Repo Shield layer)
-  "protection/intervened": { operation: string; target: string; action: "allowed" | "blocked" | "requires-approval" };
+  "protection/intervened": {
+    operation: string;
+    target: string;
+    /** `recorded` = observed under `audit`/`warn`, where nothing was blocked. */
+    action: "allowed" | "blocked" | "requires-approval" | "recorded";
+  };
 
   // checkpoints + gates (spec section 150, Helix-inspired)
   "checkpoint/started": { checkpointId: string; title: string };

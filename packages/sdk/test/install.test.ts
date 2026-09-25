@@ -1,10 +1,10 @@
 /**
  * Agent bootstrap installer tests (spec section 152).
  *
- * The install contract, pinned: five phases (inspect → understand →
- * initialize → configure → verify), metadata-only writes, idempotency,
- * README-driven intent inference, and preservation of existing
- * instructions. These tests ARE the executable form of install.yaml.
+ * The install contract, pinned: the six stages in dependency order (resolve →
+ * acc → shield → proagents → reposell → paw), the four documented identity
+ * bases, metadata-only writes, idempotency, and preservation of existing
+ * configuration. These tests ARE the executable form of install.yaml.
  */
 import { describe, expect, it, afterAll } from "vitest";
 import { mkdtemp, mkdir, rm, writeFile, readFile } from "node:fs/promises";
@@ -41,8 +41,8 @@ async function nodeProject(root: string, scripts: Record<string, string> = { tes
   await writeFile(path.join(root, "pnpm-lock.yaml"), "", "utf8");
 }
 
-describe("installWorkspace — the five-phase contract (spec 152)", () => {
-  it("runs all five phases on a plain node project and reports evidence", async () => {
+describe("installWorkspace — the six-stage contract (spec 152)", () => {
+  it("runs the six stages in dependency order on a plain node project and reports evidence", async () => {
     const root = await scratch();
     await nodeProject(root);
     await writeFile(
@@ -53,12 +53,20 @@ describe("installWorkspace — the five-phase contract (spec 152)", () => {
 
     const plan = await installWorkspace(root);
 
-    expect(plan.phases.map((p) => p.phase)).toEqual([
-      "inspect", "understand", "initialize", "configure", "verify",
+    expect(plan.stages.map((s) => s.stage)).toEqual([
+      "resolve", "acc", "shield", "proagents", "reposell", "paw",
     ]);
     expect(plan.layout).toEqual({
-      configDir: ".paw", config: ".paw/workspace.yaml", agentsFile: "AGENTS.md",
+      configDir: ".paw",
+      config: ".paw/workspace.yaml",
+      agentsFile: "AGENTS.md",
+      acc: ".acc",
+      shield: ".reposhield",
+      proagents: ".proagents",
+      reposell: ".reposell",
     });
+    // Code AND a README are both present, so identity comes from both.
+    expect(plan.basis).toBe("code-and-readme");
     // Intent derived from the README — the @README.md contract, traceably.
     expect(plan.intent.productType).toBe("browser-application");
     expect(plan.intent.domains).toContain("local-first");
@@ -69,10 +77,80 @@ describe("installWorkspace — the five-phase contract (spec 152)", () => {
     expect(plan.created).toContain("AGENTS.md");
     const pkg = JSON.parse(await readFile(path.join(root, "package.json"), "utf8")) as { name: string };
     expect(pkg.name).toBe("fixture");
-    // Verify phase reports the plan, never executes it.
-    const verify = plan.phases.find((p) => p.phase === "verify");
-    expect(verify?.status).toBe("skipped");
     expect(plan.verification.checks.some((c) => c.id === "test")).toBe(true);
+
+    // Every layer the stages claim to write is actually on disk —
+    // one directory per layer, exactly the documented layout.
+    for (const file of [
+      ".acc/config/config.yaml",
+      ".reposhield/policy.yaml",
+      ".proagents/config.yaml",
+      ".reposell/distribution.yaml",
+      ".paw/workspace.yaml",
+      "AGENTS.md",
+    ]) {
+      expect(existsSync(path.join(root, file))).toBe(true);
+    }
+    // The crew exists and every worker is bound to ACC context.
+    const crewDir = path.join(root, ".proagents", "crew", "browser-application-crew");
+    const manifest = JSON.parse(
+      await readFile(path.join(crewDir, "manifest.json"), "utf8")
+    ) as { workers: { id: string; context: { framework: string }[]; instructions: string }[] };
+    expect(manifest.workers.length).toBeGreaterThan(0);
+    for (const worker of manifest.workers) {
+      expect(worker.context.map((c) => c.framework)).toContain("acc");
+      // The crew points at the ProAgents profiles layer, and those files exist.
+      expect(worker.instructions).toMatch(/^\.proagents\/profiles\//);
+      expect(existsSync(path.join(root, worker.instructions))).toBe(true);
+    }
+    // The coordination channel lives in the ProAgents namespace, never .agents/.
+    expect(existsSync(path.join(root, ".proagents", "crew", "COMMENTS.md"))).toBe(true);
+    expect(existsSync(path.join(root, ".agents"))).toBe(false);
+  });
+
+  it("writes .paw LAST so the config never names a layer that does not exist yet", async () => {
+    const root = await scratch();
+    await nodeProject(root);
+    await writeFile(path.join(root, "README.md"), "# Fixture\n\nAn API backend service.\n", "utf8");
+
+    const plan = await installWorkspace(root);
+    const order = plan.stages.map((s) => s.stage);
+    expect(order.indexOf("paw")).toBe(order.length - 1);
+    // The config names the protection and distribution providers the earlier
+    // stages wrote policy files for.
+    const yaml = await readFile(configPathFor(root), "utf8");
+    expect(yaml).toContain("protection:");
+    expect(yaml).toContain("provider: repo-shield");
+    expect(yaml).toContain("distribution:");
+    expect(yaml).toContain("provider: reposell");
+    // And it round-trips through the schema.
+    const { config } = await loadConfig(root);
+    expect(config.protection?.provider).toBe("repo-shield");
+    expect(config.protection?.mode).toBe("guarded");
+    expect(config.distribution?.provider).toBe("reposell");
+  });
+
+  it("derives the crew from the ACC expertise map — the stages are connected, not parallel", async () => {
+    const root = await scratch();
+    await writeFile(
+      path.join(root, "package.json"),
+      JSON.stringify({ name: "fixture", dependencies: { express: "^4.0.0" } }),
+      "utf8"
+    );
+    await writeFile(path.join(root, "README.md"), "# Shop\n\nA REST API backend service.\n", "utf8");
+
+    const plan = await installWorkspace(root);
+    const accStage = plan.stages.find((s) => s.stage === "acc");
+    const proagentsStage = plan.stages.find((s) => s.stage === "proagents");
+    // An API project gets an api-engineer; the crew must contain that same id.
+    expect(accStage?.created.some((f) => f.endsWith("config.yaml"))).toBe(true);
+    expect(proagentsStage?.created.some((f) => f.endsWith("profiles/api-engineer.md"))).toBe(true);
+    const crew = proagentsStage?.created.find((f) => f.endsWith("manifest.json"));
+    expect(crew).toBeDefined();
+    const manifest = JSON.parse(await readFile(path.join(root, crew!), "utf8")) as {
+      workers: { id: string }[];
+    };
+    expect(manifest.workers.map((w) => w.id)).toContain("api-engineer");
   });
 
   it("is idempotent — a second install preserves existing instructions and config", async () => {
@@ -88,28 +166,79 @@ describe("installWorkspace — the five-phase contract (spec 152)", () => {
     // Pre-existing instructions are PRESERVED, not replaced: the installer
     // must not report creating AGENTS.md here.
     expect(first.created).not.toContain("AGENTS.md");
-    expect(first.phases.find((p) => p.phase === "configure")?.notes.join(" ")).toContain("preserved");
     const yaml = await readFile(configPathFor(root), "utf8");
 
     const second = await installWorkspace(root);
-    expect(second.created).not.toContain("AGENTS.md");
-    expect(second.phases.find((p) => p.phase === "initialize")?.notes.join(" ")).toContain("idempotent");
-    expect(second.phases.find((p) => p.phase === "configure")?.notes.join(" ")).toContain("preserved");
+    // A second run creates NOTHING at all — the whole pipeline is idempotent,
+    // not just the .paw half.
+    expect(second.created).toEqual([]);
+    expect(second.alreadyInitialized).toBe(true);
+    expect(second.stages.find((s) => s.stage === "paw")?.notes.join(" ")).toContain("preserved");
     expect(await readFile(path.join(root, "AGENTS.md"), "utf8")).toContain("NEVER overwrite me");
     expect(await readFile(configPathFor(root), "utf8")).toBe(yaml);
   });
 
-  it("degrades honestly on a bare directory with no README and no manifests", async () => {
+  it("never overwrites a hand-edited layer file", async () => {
+    const root = await scratch();
+    await nodeProject(root);
+    await mkdir(path.join(root, ".reposhield"), { recursive: true });
+    await mkdir(path.join(root, ".proagents"), { recursive: true });
+    await writeFile(path.join(root, ".reposhield", "policy.yaml"), "mode: strict  # hand-edited\n", "utf8");
+    await writeFile(path.join(root, ".proagents", "config.yaml"), "# hand-edited environment\n", "utf8");
+
+    const plan = await installWorkspace(root);
+    expect(plan.created).not.toContain(".reposhield/policy.yaml");
+    expect(plan.created).not.toContain(".proagents/config.yaml");
+    expect(await readFile(path.join(root, ".reposhield", "policy.yaml"), "utf8")).toBe("mode: strict  # hand-edited\n");
+    expect(await readFile(path.join(root, ".proagents", "config.yaml"), "utf8")).toBe("# hand-edited environment\n");
+  });
+
+  it("asks a questionnaire when there is neither code nor README, and does not guess", async () => {
     const root = await scratch();
     const plan = await installWorkspace(root);
 
     expect(plan.target.languages).toEqual([]);
-    expect(plan.intent.productType).toBe("application");
-    expect(plan.intent.domains).toEqual([]);
-    expect(plan.intent.derivedFrom).toEqual([]);
-    // Still installs — an empty workspace is a valid workspace.
-    expect(plan.phases.every((p) => p.status === "completed" || p.status === "skipped")).toBe(true);
+    expect(plan.basis).toBe("questionnaire");
+    // The resolve stage says it needs input and hands back the exact command.
+    const resolve = plan.stages.find((s) => s.stage === "resolve");
+    expect(resolve?.status).toBe("needs-input");
+    expect(plan.questionnaire?.join(" ")).toContain("paw init");
+    expect(plan.questionnaire?.join(" ")).toContain("--answers");
+
+    // The layers are still scaffolded — an empty workspace is a valid
+    // workspace — but NO project block is written, because a guessed product
+    // type is worse than an absent one.
     expect(existsSync(configPathFor(root))).toBe(true);
+    const yaml = await readFile(configPathFor(root), "utf8");
+    expect(yaml).not.toContain("project:");
+    expect(yaml).not.toContain("unknown");
+    // The crew gets a neutral name rather than "unknown-crew".
+    expect(existsSync(path.join(root, ".proagents", "crew", "project-crew", "manifest.json"))).toBe(true);
+  });
+
+  it("uses README alone when there is no code", async () => {
+    const root = await scratch();
+    await writeFile(
+      path.join(root, "README.md"),
+      "# Docs only\n\nA command-line tool for parsing CSV files.\n",
+      "utf8"
+    );
+    const plan = await installWorkspace(root);
+    expect(plan.basis).toBe("readme-only");
+    expect(plan.intent.productType).toBe("cli");
+    expect(plan.questionnaire).toBeUndefined();
+  });
+
+  it("uses code alone when there is no README", async () => {
+    const root = await scratch();
+    await writeFile(path.join(root, "Cargo.toml"), '[package]\nname = "x"\n', "utf8");
+    await writeFile(path.join(root, "src"), "fn main() {}", "utf8").catch(async () => {
+      await mkdir(path.join(root, "src"), { recursive: true });
+      await writeFile(path.join(root, "src", "main.rs"), "fn main() {}", "utf8");
+    });
+    const plan = await installWorkspace(root);
+    expect(plan.basis).toBe("code-only");
+    expect(plan.questionnaire).toBeUndefined();
   });
 
   it("reports detected coding agents in the inspect phase", async () => {
@@ -172,7 +301,7 @@ describe("file-driven init/install — the @README.md contract (spec 152)", () =
     expect(require("node:fs").existsSync(configPathFor(root))).toBe(false);
   });
 
-  it("installWorkspace({ from }) drives the five phases from the file and reports the source", async () => {
+  it("installWorkspace({ from }) drives every stage from the file and reports the source", async () => {
     const root = await scratch();
     await nodeProject(root);
     await writeFile(path.join(root, "BRIEF.md"), "# Brief\n\nAn API backend service with payments and monitoring.\n", "utf8");
@@ -181,10 +310,31 @@ describe("file-driven init/install — the @README.md contract (spec 152)", () =
     expect(plan.from).toBe("BRIEF.md");
     expect(plan.intent.productType).toBe("api");
     expect(plan.intent.domains).toEqual(expect.arrayContaining(["payments", "monitoring"]));
-    const understand = plan.phases.find((p) => p.phase === "understand");
-    expect(understand?.notes.join(" ")).toContain("intent source: BRIEF.md");
-    const initialize = plan.phases.find((p) => p.phase === "initialize");
-    expect(initialize?.notes.join(" ")).toContain("project intent persisted");
+    // The explicit source is reported in the resolve stage.
+    const resolve = plan.stages.find((s) => s.stage === "resolve");
+    expect(resolve?.notes.join(" ")).toContain("intent source: BRIEF.md");
+    // The intent from the brief reaches the LAYERS, not just the plan: an
+    // api-crew exists because the brief said API.
+    expect(existsSync(path.join(root, ".proagents", "crew", "api-crew", "manifest.json"))).toBe(true);
+    // And it is persisted into the config.
+    const yaml = await readFile(configPathFor(root), "utf8");
+    expect(yaml).toContain("productType: api");
+  });
+
+  it("throws INTENT_SOURCE_UNREADABLE from install for a missing explicit source", async () => {
+    const root = await scratch();
+    await nodeProject(root);
+    try {
+      await installWorkspace(root, { from: "nope/missing.md" });
+      expect.unreachable("install with a missing source must throw");
+    } catch (error) {
+      const shaped = (error as WorkspaceError).toJSON();
+      expect(shaped.code).toBe("INTENT_SOURCE_UNREADABLE");
+      expect(shaped.recoverable).toBe(true);
+    }
+    // An explicit-but-unreadable source must NOT silently fall back to the
+    // README — ignoring an explicit instruction is a correctness bug.
+    expect(existsSync(configPathFor(root))).toBe(false);
   });
 
   it("inferIntentFromText is pure — same input, same intent, no I/O", () => {

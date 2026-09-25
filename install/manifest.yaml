@@ -6,7 +6,7 @@
 # CLI version (the npm package is the installer).
 
 name: proagents-workspace
-version: 0.5.2
+version: 0.5.3
 type: workspace-framework
 description: >-
   The convention-first workstation for AI coding agents: one CLI (`paw`)
@@ -14,9 +14,11 @@ description: >-
   agent works through its own interface — the terminal.
 
 install:
-  # The deterministic installer. Runs the five-phase contract
-  # (see install.yaml) against the CURRENT repository.
-  command: npx @reposell/proagents-workspace@latest install
+  # The deterministic installer — `init` is the canonical bootstrapper
+  # (six stages), `install` is a stable alias. Runs against the CURRENT
+  # repository.
+  command: npx @reposell/proagents-workspace@latest init
+  alias: npx @reposell/proagents-workspace@latest install
   target: repository
 
 entrypoint:

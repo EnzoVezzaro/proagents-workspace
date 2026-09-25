@@ -7,6 +7,23 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 The repository is specification-first: until the first implementation release,
 the project stays on 0.x and everything may change.
 
+## [0.5.3] - 2026-09-25
+
+The bootstrap contract grows up: `paw init` is now the six-stage bootstrapper that installs every layer in dependency order, empty repositories get an honest questionnaire instead of a guess, and the target layout becomes directory-per-layer. Documentation and the npm landing page stay in sync with the new vocabulary.
+
+### Changed
+
+- **`paw init` is the workspace bootstrapper; `paw install` is an alias** (spec section 152) — `init` now runs the full six-stage bootstrap (resolve → acc → shield → proagents → reposell → paw) instead of the light `.paw/`-only init; `install` remains a stable alias with identical behavior. `--json` output reports `command: "init"` and `target` (detection) rather than the old init result shape.
+- **Directory-per-layer install layout** — the staged bootstrap writes `.reposhield/policy.yaml` (was `.reposhield.yaml`), `.proagents/{profiles/, crew/, config.yaml}` (was `proagents.yaml` + crews under `.agents/crews/`), and `.reposell/distribution.yaml` (was `.reposell.yaml`). The per-profession profile files moved from `.acc/config/agents/` to `.proagents/profiles/` — ACC describes WHAT the repository knows, ProAgents owns WHO operates. The crew coordination channel is written to `.proagents/crew/COMMENTS.md`; the installer never writes into `.agents/` (agent-owned, spec section 146 hygiene). Existing files at the old paths are preserved, not migrated or deleted.
+
+### Added
+
+- **Five-question project questionnaire for empty repositories** (spec section 152, resolve stage) — when no code and no README can describe the project, `paw init` asks five questions (product, purpose, technologies, distribution, protection) inline on a TTY and applies the resulting intent immediately; headless runs get the exact `paw init --answers "product" "purpose" "technologies" "distribution" "protection"` invocation instead. Answers are pure functions into a `ProjectIntent` (`questionnaire.ts`, SDK-exported: `QUESTIONNAIRE`, `questionIds`, `questionsFor`, `answersToOutcome`) with provenance `questionnaire (n/5 answered)`; the protection answer seeds the Repo Shield mode and the distribution answer seeds the reposell mode. New stable error code `QUESTIONNAIRE_EMPTY` for an `--answers` call with no usable answers.
+
+### Fixed
+
+- **Stray installer output no longer pollutes the repository** — running `paw init` in this repo (e.g. from a smoke test) wrote `.proagents/`, `.reposhield/`, and `.reposell/` into the root as untracked files; they are now git-ignored like `.paw/` (this repo's own environment stays tracked at `proagents.yaml` / `proagents.lock`).
+
 ## [0.5.2] - 2026-09-25
 
 The runbook now ships where agents actually read: the canonical spec, the npm landing page, and Getting Started all point to `docs/paw-install-runbook.md`, the complete install → set up → complete contract. Also hardens the release pipeline's registry verification so a successful publish is never reported as a failure. Documentation and release-metadata only: no code, contracts, or CLI behavior changed.

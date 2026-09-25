@@ -10,8 +10,7 @@ The CLI uses the same underlying Workspace API as the SDK — the CLI never dupl
 ## The Golden Path (convention-first)
 
 ```bash
-paw install       # agent bootstrap: inspect → understand → initialize → configure → verify [--json] [--verify]
-paw init          # make the current repository Workspace-aware (.paw/ only)
+paw init [file]   # the workspace BOOTSTRAPPER: resolve → acc → shield → proagents → reposell → paw [--json] [--verify] [--answers]
 paw status        # where am I, what is here, what is possible [--json]
 paw research      # product/environment discovery; ACC-aware [section 149]
 paw doctor        # diagnostics; optional components never appear as failures [--json]
@@ -35,16 +34,20 @@ paw checkpoint status                   # plan state [--json]
 
 Plans load from `.paw/checkpoints.json` (convention) or `checkpoints.plan` in `.paw/workspace.yaml`. Gates are PLUGINS resolved per kind/provider — behavior, security (Repo Shield), human, adversarial, and custom providers. The core rule: **attempt ≠ completion** — only passing gates complete a checkpoint; failed gates produce structured findings, and unregistered gates fail closed.
 
-## Install Command (spec section 152)
+## Init Command — the bootstrapper (spec section 152)
 
 ```bash
-paw install            # five-phase bootstrap: inspect → understand → initialize → configure → verify
-paw install BRIEF.md   # file-driven: infer the intent from BRIEF.md (default source: @README.md)
-paw install --json     # machine-readable install plan (what external agents parse)
-paw install --verify   # also execute the verification checks after the install
+paw init            # six-stage bootstrap: resolve → acc → shield → proagents → reposell → paw
+paw init BRIEF.md   # file-driven: infer the intent from BRIEF.md (default source: @README.md)
+paw init --json     # machine-readable install plan (what external agents parse)
+paw init --verify   # also execute the verification checks after the install
+paw init --answers "web app" "one sentence" "TypeScript" "open source" "guarded"
+                    # headless questionnaire for empty repositories (positional: product, purpose, technologies, distribution, protection)
 ```
 
-The agent bootstrap entrypoint: metadata-only, preserving, idempotent, accountless. It detects the project (languages, runtime, package manager, frameworks, agents), infers intent from `@README.md` + manifests (every inference names its source), creates `.paw/` metadata when absent, writes `AGENTS.md` agent notes only when none exist, and reports the verification plan without running it. With a source file, the inferred intent is persisted as the `project:` block in the generated config. Existing instructions and configuration are never overwritten. See [Agent Bootstrap](bootstrap.md).
+`paw install` is a stable ALIAS of `paw init` — the same machine, both spellings everywhere.
+
+The agent bootstrap entrypoint: metadata-only, preserving, idempotent, accountless. The six stages write one directory per layer — `.acc/config/` (knowledge), `.reposhield/policy.yaml` (rules), `.proagents/` (profiles, crew, environment), `.reposell/distribution.yaml` (distribution) — and `.paw/` LAST as the config that ties them together, plus `AGENTS.md` when absent. Every stage is reported with the files it created. On an empty repository (no code, no README) a TTY run asks five questions inline; a headless run reports the exact `--answers` invocation, and no run claims "ready" while the project intent is unknown. Existing instructions and configuration are never overwritten. See [Agent Bootstrap](bootstrap.md).
 
 ## Lifecycle Commands (spec section 151)
 

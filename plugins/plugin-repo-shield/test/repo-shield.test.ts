@@ -17,7 +17,7 @@ type ProtectionProviderShaped = {
   }>;
 };
 
-function makeCtx() {
+function makeCtx(config: Record<string, unknown> = {}) {
   const registered: { id: string; provider: Record<string, unknown> }[] = [];
   const interventions: unknown[] = [];
   // A real await-chain event bus so the veto is exercised end-to-end.
@@ -39,7 +39,7 @@ function makeCtx() {
   };
   const ctx = {
     pluginId: "repo-shield",
-    config: {},
+    config,
     pluginOptions: () => ({}),
     logger: { debug() {}, info() {}, warn() {}, error() {} },
     events,
@@ -193,5 +193,62 @@ describe("repo-shield protection plugin", () => {
     const h = makeCtx();
     h.provider();
     await expect(h.beforeWrite({ path: "/workspace/repo/.env" })).rejects.toThrow(/PROTECTION_BLOCKED/);
+  });
+});
+
+/**
+ * The declared enforcement posture (DISTRIBUTION.md section 7) must be
+ * honoured. A configured `off` that still blocks — or a `strict` that lets
+ * network egress through — is a lie about the policy the operator wrote.
+ */
+describe("repo-shield protection modes (DISTRIBUTION.md section 7)", () => {
+  const withMode = (mode: string) => makeCtx({ protection: { provider: "repo-shield", mode } });
+
+  it("off — nothing is enforced, and health says enforcement is off", async () => {
+    const h = withMode("off");
+    const decision = await h.provider().evaluate({ operation: "command", target: "git push --force origin main" });
+    expect(decision.action).toBe("allow");
+    const health = await h.provider().health();
+    expect(health.status).toBe("degraded");
+    expect(health.message).toContain("off");
+  });
+
+  it("audit — a violation is recorded on the event bus but never blocks", async () => {
+    const h = withMode("audit");
+    h.provider();
+    await expect(h.before({ command: "git push -f origin main" })).resolves.toBeUndefined();
+    expect(h.interventions).toHaveLength(1);
+    expect((h.interventions[0] as { action: string }).action).toBe("recorded");
+  });
+
+  it("warn — like audit, recorded and not blocked", async () => {
+    const h = withMode("warn");
+    const decision = await h.provider().evaluate({ operation: "command", target: "git reset --hard" });
+    expect(decision.action).toBe("allow");
+    expect(decision.reason).toContain("warn");
+  });
+
+  it("guarded — the default posture still blocks (no config declared)", async () => {
+    const h = makeCtx();
+    const decision = await h.provider().evaluate({ operation: "command", target: "git push --force" });
+    expect(decision.action).toBe("block");
+  });
+
+  it("strict — network egress is refused instead of escalated for approval", async () => {
+    const h = withMode("strict");
+    const decision = await h.provider().evaluate({ operation: "network.fetch", target: "https://example.com" });
+    expect(decision.action).toBe("block");
+  });
+
+  it("guarded — network egress still escalates rather than blocking outright", async () => {
+    const h = withMode("guarded");
+    const decision = await h.provider().evaluate({ operation: "network.fetch", target: "https://example.com" });
+    expect(decision.action).toBe("requires-approval");
+  });
+
+  it("an unrecognised mode falls back to guarded, never to permissive", async () => {
+    const h = withMode("nonsense");
+    const decision = await h.provider().evaluate({ operation: "command", target: "git push --force" });
+    expect(decision.action).toBe("block");
   });
 });

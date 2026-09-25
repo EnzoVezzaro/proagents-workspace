@@ -21,6 +21,7 @@
 import { WorkspaceClient, WorkspaceError, type WorkspaceClientOptions } from "@proagents/workspace";
 import { defineService, type ContextProvider, type ShellProvider } from "@proagents/contracts";
 import { accContextPlugin } from "@proagents/plugin-context-acc";
+import path from "node:path";
 import { bundledPlugins } from "./plugins.js";
 import { effectiveFlow } from "./flow.js";
 import {
@@ -28,9 +29,9 @@ import {
   discoverEnvironment,
   detectedAgents,
   inferVerification,
-  initWorkspace,
   installWorkspace,
   checkWorkspace,
+  QUESTIONNAIRE,
   isInitialized,
   loadConfig,
   pawDirFor,
@@ -54,7 +55,7 @@ const shellService = defineService<ShellProvider>({ id: "shell", contractVersion
  * string is what users and scripts compare).
  */
 declare const __PAW_CLI_VERSION__: string | undefined;
-const CLI_VERSION = typeof __PAW_CLI_VERSION__ !== "undefined" ? __PAW_CLI_VERSION__ : "0.5.2";
+const CLI_VERSION = typeof __PAW_CLI_VERSION__ !== "undefined" ? __PAW_CLI_VERSION__ : "0.5.3";
 const WORKSPACE_API_VERSION = "1.0.0";
 
 interface ParsedArgs {
@@ -284,41 +285,205 @@ async function runCheck(projectRoot: string, parsed: ParsedArgs): Promise<number
   return result.ok ? 0 : 1;
 }
 
-async function runInstall(projectRoot: string, parsed: ParsedArgs): Promise<number> {
-  // File-driven install (spec 152): `paw install README.md` bootstraps the
+/**
+ * `paw init` (spec section 152): the workspace BOOTSTRAPPER — `paw install`
+ * is an alias for the same machine. File-driven form (`paw init README.md`)
+ * infers intent from that file. On an empty repository (no code, no README)
+ * with a TTY, the five-question interview runs inline; headless runs get the
+ * exact `--answers` invocation that closes the loop without a TTY.
+ */
+async function runInit(projectRoot: string, parsed: ParsedArgs): Promise<number> {
+  // `--answers` accepts two spellings: `--answers="a,b,c,d,e"` (one CSV
+  // string) or `--answers "a" "b" "c" "d" "e"` (bare flag, five positional
+  // values). Either way it takes precedence: no positional argument is read
+  // as an intent source file, so an answer can never be misparsed as one.
+  const answersFlag = parsed.flags["answers"];
+  const flagAnswers =
+    typeof answersFlag === "string" && answersFlag.length > 0
+      ? answersFlag.split(",").map((a) => a.trim()).filter((a) => a.length > 0)
+      : answersFlag === true && parsed.args.length > 0
+        ? parsed.args.map((a) => a.trim()).filter((a) => a.length > 0)
+        : undefined;
+  // File-driven init (spec 152): `paw init README.md` bootstraps the
   // workspace from that file — the @README.md semantic contract.
-  const from = typeof parsed.args[0] === "string" && parsed.args[0].length > 0 ? parsed.args[0] : undefined;
-  const plan = await installWorkspace(projectRoot, from !== undefined ? { from } : {});
+  const from = flagAnswers === undefined && typeof parsed.args[0] === "string" && parsed.args[0].length > 0 ? parsed.args[0] : undefined;
+
+  const plan = await installWorkspace(projectRoot, {
+    ...(from !== undefined ? { from } : {}),
+    ...(flagAnswers !== undefined ? { answers: flagAnswers } : {}),
+  });
   if (parsed.json) {
-    process.stdout.write(`${JSON.stringify({ command: "install", ...plan }, null, 2)}\n`);
+    process.stdout.write(`${JSON.stringify({ command: "init", ...plan }, null, 2)}\n`);
     return 0;
   }
-  process.stdout.write(`Installing ProAgents Workspace into ${plan.target.projectRoot}\n\n`);
-  if (plan.from !== undefined) {
-    process.stdout.write(`Intent source: ${plan.from} → ${plan.intent.productType}\n\n`);
+  process.stdout.write(`Initializing ProAgents Workspace into ${plan.target.projectRoot}\n\n`);
+  for (const stage of plan.stages) {
+    const mark = stage.status === "completed" ? "✓" : stage.status === "needs-input" ? "!" : "○";
+    process.stdout.write(`${mark} ${stage.stage}\n`);
+    for (const note of stage.notes) process.stdout.write(`    ${note}\n`);
+    for (const file of stage.created) process.stdout.write(`    + ${file}\n`);
   }
-  for (const phase of plan.phases) {
-    const mark = phase.status === "completed" ? "✓" : "○";
-    process.stdout.write(`${mark} ${phase.phase}\n`);
-    for (const note of phase.notes) process.stdout.write(`    ${note}\n`);
+  if (plan.questionnaire !== undefined && flagAnswers === undefined) {
+    // Interactive (TTY): ask the five questions inline and apply the intent
+    // immediately — the user should not have to re-run anything. A pipeline
+    // or agent (no TTY) gets the headless instructions instead.
+    const interactive = process.stdin.isTTY === true;
+    if (interactive) {
+      process.stdout.write("\n");
+      const collected = await askQuestionnaire();
+      if (collected === null) {
+        process.stdout.write("\nInterview cancelled — the layers are scaffolded; re-run `paw init` to answer.\n");
+        return 0;
+      }
+      // Second pass with the collected answers — the same idempotent
+      // machine. The layer files pass 1 created moments ago in THIS run
+      // carry the pre-interview defaults; they are not user configuration,
+      // so this run removes exactly what IT created (never pre-existing
+      // files) and lets the answered machine rewrite them.
+      const { rm } = await import("node:fs/promises");
+      for (const made of plan.created) {
+        if (
+          made === ".paw/workspace.yaml" ||
+          made === ".reposhield/policy.yaml" ||
+          made === ".reposell/distribution.yaml" ||
+          made === ".proagents/config.yaml" ||
+          made.startsWith(".proagents/crew/project-crew")
+        ) {
+          await rm(path.join(projectRoot, made), { recursive: true, force: true });
+        }
+      }
+      const applied = await installWorkspace(projectRoot, { answers: collected });
+      process.stdout.write("\n");
+      for (const stage of applied.stages) {
+        const mark = stage.status === "completed" ? "✓" : stage.status === "needs-input" ? "!" : "○";
+        process.stdout.write(`${mark} ${stage.stage} (intent applied)\n`);
+        for (const note of stage.notes) process.stdout.write(`    ${note}\n`);
+        for (const file of stage.created) process.stdout.write(`    + ${file}\n`);
+      }
+    } else {
+      process.stdout.write("\nThis repository cannot describe itself yet. Answer the interview:\n\n");
+      for (const line of plan.questionnaire) process.stdout.write(`${line}\n`);
+      process.stdout.write("\nWorkspace scaffolded — the layers are in place, but the project intent is still unknown.\n");
+    }
   }
-  process.stdout.write("\nWorkspace ready.\n");
   const { config } = await effectiveConfig(projectRoot, parsed);
   const flow = effectiveFlow(config as Parameters<typeof effectiveFlow>[0]);
+  // Never claim "ready" when the project's identity is still unknown — the
+  // layers are in place, but an agent acting on an unverified intent is
+  // exactly what this report exists to prevent.
+  if (plan.questionnaire === undefined || flagAnswers !== undefined) {
+    process.stdout.write("\nWorkspace ready.\n");
+  }
   process.stdout.write("  · " + flow.stages.length + " phases in the effective flow — `paw lifecycle show`\n");
   process.stdout.write("  · `paw status` — the workspace picture\n");
   process.stdout.write("  · `paw verify` — run the verification checks\n");
   process.stdout.write("  · `paw lifecycle show` — the phases this workspace runs\n");
   // `--verify` executes the verification checks (the default only reports
-  // the plan — an install never runs a foreign project's tests uninvited).
+  // the plan — an init never runs a foreign project's tests uninvited).
   if (parsed.flags["verify"] === true) return await runVerify(projectRoot, parsed);
   return 0;
 }
 
+/**
+ * The interactive questionnaire runner. Asks the five questions in order,
+ * echoing the answers (basic readline echo). Returns null when the user
+ * aborts (EOF/ctrl-C) — the caller reports honestly instead of guessing.
+ */
+async function askQuestionnaire(): Promise<readonly string[] | null> {
+  const readline = await import("node:readline/promises");
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+  try {
+    const answers: string[] = [];
+    for (const q of QUESTIONNAIRE) {
+      const hint = q.hint !== undefined ? ` (${q.hint})` : "";
+      process.stdout.write(`\n? ${q.prompt}${hint}\n> `);
+      const answer = await rl.question("");
+      if (answer.trim().length === 0 && q.id === "product") {
+        // The only question without an honest fallback: no answer, no intent.
+        return null;
+      }
+      answers.push(answer.trim());
+    }
+    return answers;
+  } finally {
+    rl.close();
+  }
+}
+
+/**
+ * Check names `paw verify <name>` accepts. These are the inferred
+ * verification stages (docs/cli-reference.md) — a name selects which
+ * configured check(s) run, it is never a shell command. An unknown name is
+ * an error, never a silent full run: a typo must not quietly run the whole
+ * suite.
+ */
+const VERIFY_CHECK_NAMES = ["lint", "typecheck", "test", "build"] as const;
+
+/**
+ * Resolve a stage name onto the configured check commands it covers.
+ *
+ * Two command shapes are supported, in the order a human would expect:
+ *   - `label: command` — explicit, and the only unambiguous form.
+ *   - `command`          — matched when the stage word appears in it
+ *                          (`pnpm test` matches "test", `npm run build:cli`
+ *                          matches "build").
+ *
+ * An empty result means "nothing configured covers that stage" and is
+ * reported as a fact, never as a failure.
+ */
+function selectChecks(configured: readonly string[], stage: string): string[] {
+  const labelled: string[] = [];
+  const loose: string[] = [];
+  for (const entry of configured) {
+    const colon = entry.indexOf(":");
+    if (colon > 0) {
+      if (entry.slice(0, colon).trim() === stage) labelled.push(entry);
+    } else if (new RegExp(`(^|[^a-z])${stage}([^a-z]|$)`).test(entry)) {
+      loose.push(entry);
+    }
+  }
+  // An explicit `label:` always wins over a substring match.
+  return labelled.length > 0 ? labelled : loose;
+}
+
 async function runVerify(projectRoot: string, parsed: ParsedArgs): Promise<number> {
   const { config, sources } = await effectiveConfig(projectRoot, parsed);
-  const commands =
+  const configured =
     (config as { verification?: { commands?: string[] } }).verification?.commands ?? [];
+
+  // `paw verify [lint|typecheck|test|build]` — select checks by stage name.
+  // Configured commands may be `label: command` pairs so a selection maps
+  // onto an arbitrary command list; a bare command is matched by the stage
+  // word it contains (so `pnpm test` selects "test").
+  const selector = parsed.args[0];
+  if (selector !== undefined && !VERIFY_CHECK_NAMES.includes(selector as (typeof VERIFY_CHECK_NAMES)[number])) {
+    const payload = {
+      code: "COMMAND_NOT_FOUND",
+      message: `Unknown verify target: ${selector}`,
+      recoverable: true,
+      suggestions: [
+        `Use one of: ${VERIFY_CHECK_NAMES.join(", ")}`,
+        "Or run `paw verify` with no target to run every configured check",
+      ],
+    };
+    process.stdout.write(`${JSON.stringify(payload, null, 2)}\n`);
+    return 2;
+  }
+
+  const selected = selector === undefined ? undefined : selectChecks(configured, selector);
+  if (selected !== undefined && selected.length === 0) {
+    const payload = {
+      command: "verify",
+      ok: true,
+      check: selector,
+      results: [],
+      available: configured,
+      message: `no configured check matches "${selector}"`,
+    };
+    process.stdout.write(`${JSON.stringify(payload, null, 2)}\n`);
+    return 0;
+  }
+  const commands = selected ?? configured;
   if (commands.length === 0) {
     const payload = { command: "verify", ok: true, results: [], message: "no verification commands detected or configured" };
     process.stdout.write(`${JSON.stringify(payload, null, 2)}\n`);
@@ -340,9 +505,12 @@ async function runVerify(projectRoot: string, parsed: ParsedArgs): Promise<numbe
     }
     const ok = results.every((r) => r.exitCode === 0);
     if (parsed.json) {
-      process.stdout.write(`${JSON.stringify({ command: "verify", ok, results, workspace: ws.id }, null, 2)}\n`);
+      process.stdout.write(
+        `${JSON.stringify({ command: "verify", check: selector, ok, results, workspace: ws.id }, null, 2)}\n`
+      );
     } else {
       for (const r of results) printCheck(r.check, r.exitCode === 0, `${r.exitCode} in ${r.durationMs}ms`);
+      if (selector !== undefined) process.stdout.write(`\nSelected: ${selector}\n`);
       process.stdout.write(`\nResult: ${ok ? "PASS" : "FAIL"}\n`);
     }
     return ok ? 0 : 1;
@@ -397,12 +565,14 @@ function usage(): string {
     "Usage: paw <command> [args] [--json] [--headless]",
     "",
     "Commands:",
-    "  init [file]   Workspace-aware repo; with a file (e.g. README.md) intent is inferred from it",
-    "  install [f]   Agent bootstrap from file (default @README.md): inspect → understand → initialize → configure → verify",
+    "  init [file]   The workspace bootstrapper (six stages: resolve → acc → shield → proagents → reposell → paw);",
+    "                with a file (e.g. README.md) intent is inferred from it; on an empty repo the interview runs",
+    "  install [f]   Alias of init — the one-command bootstrap (npx … init)",
     "  status        Where am I, what is here, what is possible",
     "  research      Discover product/environment facts (ACC-aware), ask what's missing",
     "  doctor        Health of the workspace and its providers",
-    "  verify        Run detected/configured verification (lint, test, build)",
+    "  verify [check]  Run detected/configured verification; omit <check> for all",
+    "                 <check> is one of: lint, typecheck, test, build",
     "  diff          Git working-tree diff (requires git)",
     "  agent list    Detected coding agents and their integration tier",
     "  checkpoint    List/run checkpoint plans with quality gates (spec 150)",
@@ -477,34 +647,12 @@ async function main(): Promise<number> {
 
   try {
     switch (parsed.command) {
-      case "init": {
-        // File-driven init (spec 152): `paw init README.md` starts the
-        // workspace from the project's own words.
-        const from = typeof parsed.args[0] === "string" && parsed.args[0].length > 0 ? parsed.args[0] : undefined;
-        const result = await initWorkspace(projectRoot, from !== undefined ? { from } : {});
-        if (parsed.json) {
-          process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
-          return 0;
-        }
-        if (from !== undefined && result.intent !== undefined) {
-          process.stdout.write(`Intent from ${from}: ${result.intent.productType}\n`);
-          if (result.intent.domains.length > 0) process.stdout.write(`  domains: ${result.intent.domains.join(", ")}\n`);
-          if (result.intent.skills.length > 0) process.stdout.write(`  skills: ${result.intent.skills.join(", ")}\n`);
-        }
-        renderProject(result.project);
-        for (const agent of result.agents) printCheck(agent.name, true, `tier: ${agent.tier}`);
-        if (result.agents.length === 0) process.stdout.write("○ No coding agents detected\n");
-        process.stdout.write("\nProAgents Workspace initialized.\n");
-        process.stdout.write("\nCreated:\n");
-        for (const file of result.created) process.stdout.write(`  ${file}\n`);
-        process.stdout.write("\nNo runtime required.\nNo cloud account required.\n");
-        process.stdout.write("\nRun:\n  paw doctor\n  paw verify\n");
-        const agents = detectedAgents(await discoverEnvironment(projectRoot));
-        if (agents.length > 0) {
-          process.stdout.write(`  ${agents[0]!.command ?? agents[0]!.id}   # your existing agent keeps working\n`);
-        }
-        return 0;
-      }
+      // The full staged bootstrapper (spec 152): resolve → acc → shield →
+      // proagents → reposell → paw, with the interactive questionnaire on
+      // an empty repository. `install` is an alias for the same machine.
+      case "init":
+      case "install":
+        return await runInit(projectRoot, parsed);
 
       case "status":
         return await renderStatus(projectRoot, parsed);
@@ -551,9 +699,6 @@ async function main(): Promise<number> {
         process.stdout.write("\nEverything required is ready.\n");
         return 0;
       }
-
-      case "install":
-        return await runInstall(projectRoot, parsed);
 
       case "check":
         return await runCheck(projectRoot, parsed);
@@ -671,16 +816,35 @@ async function main(): Promise<number> {
           return 2;
         }
         const agents = detectedAgents(await discoverEnvironment(projectRoot));
+        // A config directory proves the tool ran here once; a PATH binary
+        // proves it can be launched NOW. Reporting the difference is the
+        // difference between "installed" and "runnable" — say which it is.
+        const launchable = agents.filter((a) => a.detectedVia === "binary");
         if (parsed.json) {
-          process.stdout.write(`${JSON.stringify({ command: "agent list", agents }, null, 2)}\n`);
+          process.stdout.write(
+            `${JSON.stringify(
+              { command: "agent list", agents, launchable: launchable.map((a) => a.id) },
+              null,
+              2
+            )}\n`
+          );
           return 0;
         }
         if (agents.length === 0) {
-          process.stdout.write("No coding agents detected. Install one: codex, claude, opencode, gemini, dsh.\n");
+          process.stdout.write(
+            "No coding agents detected. Install one: codex, claude, opencode, gemini, dsh, copilot, cursor-agent.\n"
+          );
           return 0;
         }
         for (const agent of agents) {
-          process.stdout.write(`${agent.name.padEnd(20)} tier: ${agent.tier}${agent.command !== undefined ? `  launch: ${agent.command}` : ""}\n`);
+          const via = agent.detectedVia === "binary" ? "on PATH" : "config only";
+          const launch = agent.command !== undefined ? `  run: ${agent.command}` : "";
+          process.stdout.write(
+            `${agent.name.padEnd(22)} tier: ${(agent.tier ?? "detect").padEnd(10)} ${via}${launch}\n`
+          );
+        }
+        if (launchable.length === 0) {
+          process.stdout.write("\nNone are on PATH — install the CLI to launch one.\n");
         }
         return 0;
       }

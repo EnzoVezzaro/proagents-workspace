@@ -18,7 +18,7 @@ No CLI at all? Paste this into any coding agent (Claude Code, Codex, Gemini CLI,
 Setup https://github.com/EnzoVezzaro/proagents-workspace for @README.md (project's instructions).
 ```
 
-The agent follows the [bootstrap protocol](https://github.com/EnzoVezzaro/proagents-workspace/blob/main/install/AGENT.md) and runs `npx @reposell/proagents-workspace@latest install README.md` — the five-phase bootstrap: inspect → understand → initialize → configure → verify.
+The agent follows the [bootstrap protocol](https://github.com/EnzoVezzaro/proagents-workspace/blob/main/install/AGENT.md) and runs `npx @reposell/proagents-workspace@latest init README.md` — the six-stage bootstrap: resolve → acc → shield → proagents → reposell → paw (`install` is a stable alias).
 
 For the complete **install → set up → complete** contract — a ready-to-paste start prompt, the long-run operating playbook (finish line, stop conditions, evidence-checked subagents, self-review), the verification gates, failure handling, and the final report — see the [PAW Installation Runbook](https://github.com/EnzoVezzaro/proagents-workspace/blob/main/docs/paw-install-runbook.md).
 
@@ -30,8 +30,8 @@ Works with Codex, Claude Code, OpenCode, Gemini CLI, DeepSeek Harness, and custo
 
 | Command | What it does |
 |---|---|
-| `paw init [file]` | Detects project + agents, creates minimal `.paw/` metadata, infers verification; with a file (e.g. `README.md`) the inferred intent is persisted as the `project:` block |
-| `paw install [file]` | The same five-phase bootstrap as the npx entrypoint: inspect → understand → initialize → configure → verify |
+| `paw init [file]` | The workspace BOOTSTRAPPER: runs the six-stage bootstrap (resolve → acc → shield → proagents → reposell → paw), writing each layer's configuration; with a file (e.g. `README.md`) the inferred intent is persisted as the `project:` block |
+| `paw install [file]` | Stable alias of `paw init` — the same six-stage bootstrap, both spellings everywhere |
 | `paw lifecycle show` | The canonical phase flow this workspace runs (create → … → operate) |
 | `paw status` | Where am I, what project, what branch, what agents, what verification |
 | `paw research` | Product/environment discovery (ACC-aware); hands agent requirements to ProAgents |

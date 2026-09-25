@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { WorkspaceError, defineService } from "@proagents/contracts";
-import { ServiceRegistry } from "../src/service-registry.js";
+import { ServiceRegistry, isCapabilityId } from "../src/service-registry.js";
 
 interface FakeRepository {
   clone(): Promise<string>;
@@ -60,5 +60,18 @@ describe("ServiceRegistry", () => {
     expect(registry.list()).toEqual([
       { id: "repository", contractVersion: "1.0.0", pluginId: "git", capability: "repository" },
     ]);
+  });
+
+  it("resolves the `harness` capability by id", () => {
+    // Regression: `harness` was missing from CAPABILITIES while the
+    // HarnessProvider contract and the `harness` service id both existed, so
+    // capability lookup silently refused a declared adapter.
+    expect(isCapabilityId("harness")).toBe(true);
+    expect(isCapabilityId("definitely-not-a-capability")).toBe(false);
+    const registry = new ServiceRegistry();
+    const adapter = { attach: async () => ({}), enforce: async () => ({}) };
+    registry.register({ id: "harness", contractVersion: "1.0.0" }, adapter, "harness-opencode");
+    expect(registry.capability("harness")).toBe(adapter);
+    expect(registry.list()[0]?.capability).toBe("harness");
   });
 });

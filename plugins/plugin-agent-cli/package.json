@@ -1,6 +1,6 @@
 {
   "name": "@proagents/plugin-agent-cli",
-  "version": "0.5.2",
+  "version": "0.5.3",
   "description": "CLI agent capability providers (claude, codex, opencode, gemini) for ProAgents Workspace — availability detection with honest degradation.",
   "license": "MIT",
   "type": "module",

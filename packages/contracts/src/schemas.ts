@@ -147,6 +147,28 @@ export type PluginManifest = z.infer<typeof pluginManifestSchema>;
 export const approvalModeSchema = z.enum(["autonomous", "guarded", "manual"]);
 
 /**
+ * Protection enforcement modes (DISTRIBUTION.md section 7). This is a
+ * SEPARATE axis from `approval.mode`: approval decides WHO decides, while
+ * protection decides HOW STRICTLY a violating operation is treated.
+ *
+ *   off      — the protection provider is not enforced
+ *   audit    — operations are recorded, never blocked
+ *   warn     — violations produce a warning, execution continues
+ *   guarded  — violations require policy evaluation and may need approval
+ *   strict   — violations are blocked
+ *
+ * `guarded` is the default and preserves the shipped behaviour: a
+ * destructive operation is refused unless it is explicitly allowed.
+ */
+export const protectionModeSchema = z.enum([
+  "off",
+  "audit",
+  "warn",
+  "guarded",
+  "strict",
+]);
+
+/**
  * Sandbox policy modes (spec section 142). `workspace-write` is the
  * backward-compatible default; `read-only` is the recommended mode for
  * unattended multi-workspace runs (DeepSeek Harness parity, minus its
@@ -557,7 +579,7 @@ export const workspaceConfigSchema = z.object({
   protection: z
     .object({
       provider: z.string().min(1),
-      mode: approvalModeSchema.default("guarded"),
+      mode: protectionModeSchema.default("guarded"),
     })
     .optional(),
   distribution: z
@@ -608,6 +630,7 @@ export type WorkspaceConfig = z.infer<typeof workspaceConfigSchema>;
 
 export type NetworkMode = z.infer<typeof networkModeSchema>;
 export type ApprovalMode = z.infer<typeof approvalModeSchema>;
+export type ProtectionMode = z.infer<typeof protectionModeSchema>;
 export type SandboxMode = z.infer<typeof sandboxModeSchema>;
 export type SandboxPolicy = z.infer<typeof sandboxPolicySchema>;
 export type WorkspaceEntry = z.infer<typeof workspaceEntrySchema>;

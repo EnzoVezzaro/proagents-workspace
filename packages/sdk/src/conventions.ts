@@ -368,6 +368,13 @@ export interface DiscoveredIntegration {
   readonly tier: IntegrationTier;
   /** `true` when the binary/config was actually found in this environment. */
   readonly detected: boolean;
+  /**
+   * WHAT the detection is evidence of. A config directory proves the tool
+   * ran here once; a PATH binary proves it can be launched right now. Both
+   * count as detected, but they are not the same promise, so the report
+   * distinguishes them instead of presenting a flat yes/no.
+   */
+  readonly detectedVia?: "binary" | "config";
   /** What was found (PATH entry, config file list, profiles…). */
   readonly detail?: string;
   /** The command that launches the integration, when it declares one. */
@@ -393,6 +400,8 @@ const INTEGRATIONS: readonly (DiscoveredIntegration & { readonly probe?: { reado
   { id: "gemini", name: "Gemini CLI", kind: "agent-framework", tier: "process", detected: false, probe: { bin: "gemini" }, command: "gemini" },
   { id: "dsh", name: "DeepSeek Harness", kind: "agent-framework", tier: "process", detected: false, probe: { bin: "dsh" }, command: "dsh" },
   { id: "aider", name: "Aider", kind: "agent-framework", tier: "detect", detected: false, probe: { bin: "aider" } },
+  { id: "copilot", name: "GitHub Copilot CLI", kind: "agent-framework", tier: "process", detected: false, probe: { bin: "copilot" }, command: "copilot" },
+  { id: "cursor", name: "Cursor Agent", kind: "agent-framework", tier: "process", detected: false, probe: { bin: "cursor-agent", files: [{ dir: "home", path: ".cursor" }] }, command: "cursor-agent" },
   // ---- context systems ----
   { id: "acc", name: "ACC", kind: "context-framework", tier: "environment", detected: false, probe: { bin: "acc", files: [{ dir: "project", path: ".acc" }] }, command: "acc" },
   { id: "agents-md", name: "AGENTS.md", kind: "context-framework", tier: "environment", detected: false, probe: { files: [{ dir: "project", path: "AGENTS.md" }] } },
@@ -413,12 +422,14 @@ export async function discoverEnvironment(projectRoot: string): Promise<Discover
   const found: DiscoveredIntegration[] = [];
   for (const integration of INTEGRATIONS) {
     let detected = false;
+    let detectedVia: "binary" | "config" | undefined;
     let detail: string | undefined;
     const probe = integration.probe;
     if (probe?.bin !== undefined) {
       const binPath = await which(probe.bin);
       if (binPath !== null) {
         detected = true;
+        detectedVia = "binary";
         detail = binPath;
       }
     }
@@ -430,6 +441,7 @@ export async function discoverEnvironment(projectRoot: string): Promise<Discover
       }
       if (present.length > 0) {
         detected = true;
+        detectedVia = "config";
         detail = present.join(", ");
       }
     }
@@ -439,6 +451,7 @@ export async function discoverEnvironment(projectRoot: string): Promise<Discover
       kind: integration.kind,
       tier: integration.tier,
       detected,
+      ...(detectedVia !== undefined ? { detectedVia } : {}),
       ...(detail !== undefined ? { detail } : {}),
       ...(integration.command !== undefined ? { command: integration.command } : {}),
     });
@@ -543,7 +556,20 @@ export interface InitResult {
 
 export async function initWorkspace(
   projectRoot: string,
-  options: { readonly from?: string } = {}
+  options: {
+    readonly from?: string;
+    /** A pre-resolved intent to write through instead of re-deriving one. */
+    readonly intent?: ProjectIntent;
+    /**
+     * Cross-cutting layers to wire into a freshly created config (spec
+     * section 152, stage 5). The staged installer passes the providers it
+     * already wrote policy files for, so `.paw/workspace.yaml` is the one
+     * artifact that references every layer. Ignored when the config already
+     * exists — the installer never edits a config it did not create.
+     */
+    readonly protection?: { readonly provider: string; readonly mode?: string };
+    readonly distribution?: { readonly provider: string };
+  } = {}
 ): Promise<InitResult> {
   const project = await detectProject(projectRoot);
   const verification = await inferVerification(projectRoot);
@@ -556,8 +582,10 @@ export async function initWorkspace(
   // carry the result into the config. An UNREADABLE file is a structured
   // error — silently omitting it would make the config lie about what it
   // understood. Manifest evidence is included so provenance is complete.
-  let intent: ProjectIntent | undefined;
-  if (options.from !== undefined) {
+  // A pre-resolved `intent` (the staged installer, which has already read
+  // the evidence) takes precedence and is written through unchanged.
+  let intent: ProjectIntent | undefined = options.intent;
+  if (intent === undefined && options.from !== undefined) {
     const resolved = path.resolve(projectRoot, options.from);
     let text: string | null = null;
     try {
@@ -605,6 +633,29 @@ export async function initWorkspace(
       lines.push("verification:", "  commands:");
       for (const check of verification.checks) lines.push(`    - ${check.command}`);
       lines.push("");
+    }
+    // The cross-cutting layers the staged installer already wrote policy
+    // files for. Naming the providers here is what makes `.paw/` the
+    // integration point: without these lines the repo-shield and reposell
+    // files would be inert documents nobody reads.
+    if (options.protection !== undefined) {
+      lines.push(
+        "# Protection (spec section 152, stage 2) — policy lives in .reposhield.yaml;",
+        "# this block activates it. `mode` is also the mode recorded there.",
+        "protection:",
+        `  provider: ${options.protection.provider}`,
+        `  mode: ${options.protection.mode ?? "guarded"}`,
+        "",
+      );
+    }
+    if (options.distribution !== undefined) {
+      lines.push(
+        "# Distribution (spec section 152, stage 4) — consumed from reposell,",
+        "# never re-implemented by the workspace.",
+        "distribution:",
+        `  provider: ${options.distribution.provider}`,
+        "",
+      );
     }
     if (intent !== undefined) {
       lines.push(

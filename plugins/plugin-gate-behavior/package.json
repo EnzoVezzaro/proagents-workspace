@@ -1,6 +1,6 @@
 {
   "name": "@proagents/plugin-gate-behavior",
-  "version": "0.5.2",
+  "version": "0.5.3",
   "description": "behavior gate plugin for ProAgents Workspace checkpoints (spec section 150)",
   "license": "MIT",
   "type": "module",

@@ -1,6 +1,6 @@
 {
   "name": "@proagents/plugin-agent-codex",
-  "version": "0.5.2",
+  "version": "0.5.3",
   "description": "Codex agent capability provider for ProAgents Workspace — availability detection with honest degradation.",
   "license": "MIT",
   "type": "module",

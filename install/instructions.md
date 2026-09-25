@@ -12,36 +12,46 @@ repository's bootstrap protocol (`install/AGENT.md`) and runs the
 deterministic installer:
 
 ```bash
-npx @reposell/proagents-workspace@latest install
+npx @reposell/proagents-workspace@latest init
 ```
+
+(`install` is a stable alias for the same machine.)
 
 ## What the install does
 
-Five phases, metadata only (see [install.yaml](install.yaml)):
+Six stages, metadata only (see [install.yaml](install.yaml)):
 
 ```
-inspect  →  understand  →  initialize  →  configure  →  verify
+resolve  →  acc  →  shield  →  proagents  →  reposell  →  paw
 ```
 
-| Phase | What happens |
+| Stage | What happens |
 |-------|--------------|
-| inspect | Detects languages, runtime, package manager, frameworks, monorepo, coding agents |
-| understand | Infers project intent (product type, domains, skills) from `README.md` + manifests |
-| initialize | Creates `.paw/` metadata (config, sessions, artifacts) — existing config is preserved |
-| configure | Writes `AGENTS.md` agent notes when absent; reports the verification plan and lifecycle |
-| verify | Reports the verification plan; executes checks only with `--verify` |
+| resolve | Detects languages, runtime, package manager, frameworks, monorepo, coding agents; decides where identity comes from: code AND README, else README, else code, else the questionnaire |
+| acc | Writes the ACC knowledge layer (`.acc/config/config.yaml`) from DETECTED languages only |
+| shield | Writes the Repo Shield policy (`.reposhield/policy.yaml`) — what must never happen, enforced before execution |
+| proagents | Writes WHO operates — profiles (`.proagents/profiles/`), a crew wired to ACC context (`.proagents/crew/`), the environment config (`.proagents/config.yaml`) |
+| reposell | Writes the distribution posture (`.reposell/distribution.yaml`) — consumed, never re-implemented |
+| paw | Creates `.paw/` LAST — the config that names the protection and distribution providers — plus `AGENTS.md` when absent; reports the verification plan |
 
 What it NEVER does: modify application code, rewrite `package.json`,
-change git state, overwrite an existing configuration file, or require an
-account.
+change git state, overwrite an existing configuration file, write into
+`.agents/` (agent-owned), or require an account.
 
 ## What the repository looks like afterwards
 
 ```
 repo/
-├── AGENTS.md              ← agent notes (only if none existed)
-└── .paw/                  ← runtime configuration
-    ├── workspace.yaml     ← minimal config; everything else is inferred
+├── AGENTS.md                  ← agent notes (only if none existed)
+├── .acc/config/               ← ACC knowledge layer (optional at runtime)
+├── .reposhield/policy.yaml    ← the rules: enforcement before execution
+├── .proagents/                ← WHO operates
+│   ├── profiles/              ← one persona contract per profession
+│   ├── crew/                  ← crews wired to ACC context + COMMENTS.md
+│   └── config.yaml            ← the agent environment
+├── .reposell/distribution.yaml ← licensing + distribution (consumed)
+└── .paw/                      ← runtime configuration
+    ├── workspace.yaml         ← minimal config; ties the layers together
     ├── sessions/
     └── artifacts/
 ```
@@ -56,24 +66,26 @@ repo/
 
 | Context | Command |
 |---------|---------|
-| Agent-led, no CLI installed (canonical) | `npx @reposell/proagents-workspace@latest install README.md` |
-| `paw` installed, init from a file | `paw init README.md` (or `paw install <file>`) |
+| Agent-led, no CLI installed (canonical) | `npx @reposell/proagents-workspace@latest init README.md` |
+| `paw` installed, init from a file | `paw init README.md` |
 | `paw` installed, plain init | `paw init` |
+| Empty repository (no code, no README) | `paw init` in a terminal asks five questions; headless: `paw init --answers "web app" "one sentence" "TypeScript" "open source" "guarded"` |
 | Inspect after init | `paw status` |
 
-All paths run the same five-phase contract and end with the same layout
+All paths run the same six-stage contract and end with the same layout
 above; the file argument makes the intent explicit and persists it as the
 `project:` block in `.paw/workspace.yaml`.
 
 ## Flags
 
 ```bash
-npx @reposell/proagents-workspace@latest install --json      # machine-readable report
-npx @reposell/proagents-workspace@latest install --verify    # also run verification checks
+npx @reposell/proagents-workspace@latest init --json      # machine-readable report
+npx @reposell/proagents-workspace@latest init --verify    # also run verification checks
+npx @reposell/proagents-workspace@latest init --answers "…" "…" "…" "…" "…"  # headless interview
 ```
 
-Already initialized? Running install again is a no-op (idempotent) — use
-`paw init` / `paw status` directly instead.
+Already initialized? Running init again is a no-op (idempotent) — use
+`paw status` directly instead.
 
 ## The install/ contract folder
 
@@ -81,6 +93,6 @@ The files next to this guide are the machine-readable statements of the
 process above:
 
 - [`manifest.yaml`](manifest.yaml) — package metadata, the installer command, the configuration directory
-- [`install.yaml`](install.yaml) — the install contract as data: the five phases, what is written, what is NEVER touched
+- [`install.yaml`](install.yaml) — the install contract as data: the six stages, what is written, what is NEVER touched
 - [`AGENT.md`](AGENT.md) — the protocol an external coding agent follows
 - [`../templates/AGENTS.md`](../templates/AGENTS.md) — the shape of the AGENTS.md generated in the target repository

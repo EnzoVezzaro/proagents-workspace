@@ -489,6 +489,7 @@ export const CAPABILITIES = [
   "repository",
   "context",
   "agent",
+  "harness",
   "filesystem",
   "shell",
   "terminal",

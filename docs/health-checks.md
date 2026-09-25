@@ -68,7 +68,7 @@ Three systems, three independent checkers — no cross-dependency:
 
 ## Rules
 
-- `paw check` never mutates anything — it reports; `paw install`/`paw init` repair.
+- `paw check` never mutates anything — it reports; `paw init` (alias `paw install`) repair.
 - Codes are a stability contract (section 99): never reused, never retyped.
 - The release checklist treats `paw check` as a pre-publish blocking step.
 

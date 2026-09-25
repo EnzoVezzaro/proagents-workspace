@@ -107,13 +107,15 @@ describe("paw init golden path (e2e, spec 3/63/71)", () => {
   it("init → status → verify works in a fresh fixture without git, agents, or cloud", async () => {
     const root = await fixture({ test: "echo tested" });
 
-    // 1. init — creates .paw/ metadata only.
+    // 1. init — the staged bootstrapper; `target` carries the detection.
     const init = await paw(["init", "--json"], { cwd: root });
     expect(init.code).toBe(0);
-    const initOut = JSON.parse(init.stdout) as { created: string[]; project: { runtime?: string } };
-    expect(initOut.project.runtime).toBe("node");
+    const initOut = JSON.parse(init.stdout) as { created: string[]; target: { runtime?: string }; stages: { stage: string }[] };
+    expect(initOut.target.runtime).toBe("node");
     expect(initOut.created.some((f) => f === path.join(".paw", "workspace.yaml"))).toBe(true);
     expect(existsSync(path.join(root, ".paw", "workspace.yaml"))).toBe(true);
+    // The six stages ran — init IS the bootstrapper now.
+    expect(initOut.stages.map((s) => s.stage)).toEqual(["resolve", "acc", "shield", "proagents", "reposell", "paw"]);
 
     // 2. status — answers where/what without throwing.
     const status = await paw(["status", "--json"], { cwd: root });
@@ -184,6 +186,50 @@ describe("paw verify (e2e)", () => {
     const parsed = JSON.parse(r.stdout) as { ok: boolean; results: unknown[]; message?: string };
     expect(parsed.ok).toBe(true);
     expect(parsed.results).toEqual([]);
+  });
+
+  it("runs ONLY the selected check, not the whole suite", async () => {
+    // A selection that silently ran everything was a real defect: the
+    // documented `paw verify test` executed every configured check.
+    const root = await fixture({ lint: "echo lint", test: "echo test" });
+    await paw(["init"], { cwd: root });
+    const r = await paw(["verify", "test", "--json"], { cwd: root });
+    expect(r.code).toBe(0);
+    const parsed = JSON.parse(r.stdout) as { check: string; results: { command: string }[] };
+    expect(parsed.check).toBe("test");
+    expect(parsed.results).toHaveLength(1);
+    expect(parsed.results[0]?.command).toContain("test");
+  });
+
+  it("omitting the target still runs every configured check", async () => {
+    const root = await fixture({ lint: "echo lint", test: "echo test" });
+    await paw(["init"], { cwd: root });
+    const r = await paw(["verify", "--json"], { cwd: root });
+    expect(r.code).toBe(0);
+    const parsed = JSON.parse(r.stdout) as { check?: string; results: unknown[] };
+    expect(parsed.check).toBeUndefined();
+    expect(parsed.results.length).toBeGreaterThan(1);
+  });
+
+  it("an unknown verify target is an actionable error, never a full run", async () => {
+    const root = await fixture({ test: "echo test" });
+    await paw(["init"], { cwd: root });
+    const r = await paw(["verify", "tset", "--json"], { cwd: root });
+    expect(r.code).toBe(2);
+    const parsed = JSON.parse(r.stdout) as { code: string; message: string };
+    expect(parsed.code).toBe("COMMAND_NOT_FOUND");
+    expect(parsed.message).toContain("tset");
+  });
+
+  it("a stage nothing is configured for reports a fact, not a failure", async () => {
+    const root = await fixture({ lint: "echo lint" });
+    await paw(["init"], { cwd: root });
+    const r = await paw(["verify", "build", "--json"], { cwd: root });
+    expect(r.code).toBe(0);
+    const parsed = JSON.parse(r.stdout) as { ok: boolean; results: unknown[]; available: string[] };
+    expect(parsed.ok).toBe(true);
+    expect(parsed.results).toEqual([]);
+    expect(parsed.available).toHaveLength(1);
   });
 });
 

@@ -115,39 +115,42 @@ The installer can run straight from `npx` with nothing pre-installed. Choose one
 
 ```bash
 # One-shot, no global install (the bootstrap default)
-npx @reposell/proagents-workspace@latest install [BRIEF.md]
+npx @reposell/proagents-workspace@latest init [BRIEF.md]
 
 # Or install the CLI once, then reuse `paw`
 npm install -g @reposell/proagents-workspace
-paw install [BRIEF.md]     # or: paw init [BRIEF.md]
+paw init [BRIEF.md]        # alias: paw install [BRIEF.md]
 ```
 
 Requires Node.js 18+. No account, token, Docker, or desktop app. If a global `paw` is already installed, record its version and stop before upgrading it (an upgrade can change output and overwrite local fixes).
 
-### Run the deterministic installer (five phases)
+### Run the deterministic installer (six stages)
 
 The installer is the supported path; it is idempotent and metadata-only. Pass the project's own description file (a README, a brief, any text file) so the inferred intent is persisted as the `project:` block in `.paw/workspace.yaml`:
 
 ```bash
-paw install            # default source: @README.md
-paw install README.md  # intent inferred from README.md
-paw install --json     # machine-readable five-phase report (what external agents parse)
-paw install --verify   # install, then run the verification checks
+paw init            # default source: @README.md
+paw init README.md  # intent inferred from README.md
+paw init --json     # machine-readable six-stage report (what external agents parse)
+paw init --verify   # install, then run the verification checks
+paw init --answers "web app" "one sentence" "TypeScript" "open source" "guarded"
+                    # headless questionnaire for empty repositories
 ```
 
-`npx @reposell/proagents-workspace@latest install` and `paw install` / `paw init` are the same five-phase machine.
+`npx @reposell/proagents-workspace@latest init` and `paw init` (alias `paw install`) are the same six-stage machine.
 
-| Phase | What happens | Writes | Preserves |
+| Stage | What happens | Writes | Preserves |
 |-------|--------------|--------|-----------|
-| inspect | Detect languages, runtime, package manager, frameworks, monorepo, coding agents | — | — |
-| understand | Infer project intent (product type, domains, skills) from `README.md` + manifests; every inference names its source | — | — |
-| initialize | Create `.paw/` metadata (`workspace.yaml`, `sessions/`, `artifacts/`) when absent | `.paw/` | existing `.paw/workspace.yaml` |
-| configure | Write `AGENTS.md` agent notes when absent; report verification plan + lifecycle | `AGENTS.md` | existing `AGENTS.md` |
-| verify | Report the verification plan; execute only with `--verify` | — | — |
+| resolve | Detect languages, runtime, package manager, frameworks, monorepo, coding agents; decide where identity comes from (code + README, else README, else code, else the questionnaire) | — | — |
+| acc | Write the ACC knowledge layer from detected languages only | `.acc/config/config.yaml` | existing `.acc/` |
+| shield | Write the Repo Shield policy — what must never happen | `.reposhield/policy.yaml` | existing `.reposhield/` |
+| proagents | Write profiles, the crew (wired to ACC context), and the environment config | `.proagents/` | existing `.proagents/` |
+| reposell | Write the distribution posture (consumed, never re-implemented) | `.reposell/distribution.yaml` | existing `.reposell/` |
+| paw | Create `.paw/` LAST; write `AGENTS.md` when absent; report verification plan + lifecycle | `.paw/`, `AGENTS.md` | existing `.paw/workspace.yaml`, existing `AGENTS.md` |
 
-The installer's `never` list (the contract, mirrored by tests): it never modifies application code, never rewrites `package.json` or any manifest, never changes git state, never overwrites an existing configuration file, and never requires an account, token, or network access beyond `npx` itself.
+The installer's `never` list (the contract, mirrored by tests): it never modifies application code, never rewrites `package.json` or any manifest, never changes git state, never overwrites an existing configuration file, never writes into `.agents/` (agent-owned), and never requires an account, token, or network access beyond `npx` itself.
 
-Exit codes: `0` install completed (all five phases); `1` install failed (structured error on stderr). An unreadable source file is a structured `INTENT_SOURCE_UNREADABLE` error.
+Exit codes: `0` install completed (all six stages; a `needs-input` resolve — the questionnaire — is still exit 0); `1` install failed (structured error on stderr). An unreadable source file is a structured `INTENT_SOURCE_UNREADABLE` error.
 
 The SDK is `@proagents/workspace`; the CLI and SDK share the same implementation.
 
@@ -206,7 +209,7 @@ git status --short --untracked-files=all
 
 | Gate | Completion condition |
 |------|----------------------|
-| install | Exit `0`; five phases reported |
+| install | Exit `0`; six stages reported |
 | status | Reports an initialized workspace |
 | doctor | Required components ready; optional ones marked optional, not failed |
 | check | `PASS` — no error-severity findings |
@@ -337,7 +340,7 @@ Complete
 
 ## Related
 
-- [Agent Bootstrap](bootstrap.md) — the one-line five-phase install contract
+- [Agent Bootstrap](bootstrap.md) — the one-line six-stage install contract
 - [Getting Started](getting-started.md) — install, create, connect an agent
 - [CLI Reference](cli-reference.md) — every `paw` command
 - [Configuration](configuration.md) — `.paw/workspace.yaml` reference

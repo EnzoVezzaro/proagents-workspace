@@ -10,6 +10,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { defineService } from "../src/services.js";
+import { CAPABILITIES } from "../src/providers.js";
 import type {
   HarnessDecision,
   HarnessEnforcement,
@@ -64,6 +65,13 @@ describe("HarnessProvider contract", () => {
     expect(definition.id).toBe("harness");
     expect(definition.contractVersion).toBe("1.0.0");
     expect(_payload.event).toMatch(/^[a-z]+(\/[a-z0-9-]+)+$/);
+  });
+
+  it("registers `harness` as a canonical capability id", () => {
+    // Regression: the contract and the `harness` service id existed, but
+    // `harness` was absent from CAPABILITIES — so `services.capability()` and
+    // `isCapabilityId()` silently refused to resolve a declared adapter.
+    expect(CAPABILITIES).toContain("harness");
   });
 
   it("reports enforcement honestly on an advisory surface", async () => {

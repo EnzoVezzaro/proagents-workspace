@@ -36,10 +36,9 @@ paw
 Key commands every document must agree on:
 
 ```bash
-paw install                                # agent bootstrap: the five-phase install (spec section 152)
-paw init README.md                         # file-driven init: infer intent from a source file (also: paw install <file>)
+paw init [file]                            # the workspace BOOTSTRAPPER: six stages (spec section 152); alias: paw install
+paw init --answers "a" "b" "c" "d" "e"     # headless questionnaire for empty repositories (order: product, purpose, technologies, distribution, protection)
 paw check                                  # self-diagnostics: PAW0xx-coded drift checks (spec section 153)
-paw init                                   # convention-first: initialize current repository
 paw status | research | doctor | verify | diff   # convention-first surface (current repo)
 paw agent list                             # detected agents + integration tiers
 paw research answer <id> <answer>          # interview loop

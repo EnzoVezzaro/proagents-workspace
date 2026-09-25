@@ -125,17 +125,21 @@ mcp:
 
 ### Local project mode (default)
 
-`paw init` creates ONLY workspace metadata, clearly separated from source code:
+`paw init` (the six-stage bootstrapper, spec section 152) creates ONLY workspace metadata and layer configuration, clearly separated from source code:
 
 ```text
 my-project/
-├── src/                # your code — untouched
-├── package.json        # your manifest — untouched
-└── .paw/
-    ├── workspace.yaml  # minimal configuration (version: 1 is valid)
-    ├── research/       # paw research artifacts (spec section 149)
-    ├── proagents/      # ProAgents handoff (requirements.json)
-    ├── sessions/       # append-only session logs (spec section 143)
+├── src/                        # your code — untouched
+├── package.json                # your manifest — untouched
+├── .acc/config/                # ACC knowledge layer (stage 2)
+├── .reposhield/policy.yaml     # Repo Shield rules (stage 3)
+├── .proagents/                 # profiles, crew, config (stage 4)
+├── .reposell/distribution.yaml # distribution posture (stage 5)
+└── .paw/                       # runtime configuration (stage 6)
+    ├── workspace.yaml          # minimal configuration (version: 1 is valid)
+    ├── research/               # paw research artifacts (spec section 149)
+    ├── proagents/              # ProAgents handoff (requirements.json)
+    ├── sessions/               # append-only session logs (spec section 143)
     └── artifacts/
 ```
 

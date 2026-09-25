@@ -108,4 +108,31 @@ describe("workspaceConfigSchema", () => {
     });
     expect(parsed.success).toBe(false);
   });
+
+  it("accepts every documented protection mode (DISTRIBUTION.md section 7)", () => {
+    // Regression: `protection.mode` was validated with the APPROVAL
+    // vocabulary, so the five modes the distribution spec documents
+    // (off/audit/warn/guarded/strict) were all rejected by the schema.
+    for (const mode of ["off", "audit", "warn", "guarded", "strict"]) {
+      const parsed = workspaceConfigSchema.safeParse({
+        protection: { provider: "repo-shield", mode },
+      });
+      expect(parsed.success, `protection.mode: ${mode}`).toBe(true);
+    }
+  });
+
+  it("defaults protection to the safe guarded posture", () => {
+    const parsed = workspaceConfigSchema.safeParse({ protection: { provider: "repo-shield" } });
+    expect(parsed.success).toBe(true);
+    if (parsed.success) expect(parsed.data.protection?.mode).toBe("guarded");
+  });
+
+  it("keeps the approval and protection axes distinct", () => {
+    // Approval decides WHO decides; protection decides HOW STRICTLY. An
+    // approval value must not be accepted as a protection mode.
+    const parsed = workspaceConfigSchema.safeParse({
+      protection: { provider: "repo-shield", mode: "autonomous" },
+    });
+    expect(parsed.success).toBe(false);
+  });
 });

@@ -5229,8 +5229,10 @@ Setup https://github.com/EnzoVezzaro/proagents-workspace for @README.md (project
 The agent — with no prior knowledge of ProAgents — reads this repository's bootstrap protocol and runs the deterministic installer:
 
 ```bash
-npx @reposell/proagents-workspace@latest install
+npx @reposell/proagents-workspace@latest init
 ```
+
+`install` is a stable alias for the same machine (`npx @reposell/proagents-workspace@latest install`).
 
 The ecosystem roles are unchanged (section 2): ProAgents is WHO the agent is (https://github.com/EnzoVezzaro/proagents), ACC is WHAT it understands, the Workspace is WHERE it works. The Workspace bootstrap never requires ProAgents and never speaks for it.
 
@@ -5244,26 +5246,29 @@ The ecosystem roles are unchanged (section 2): ProAgents is WHO the agent is (ht
 |------|------|
 | `AGENTS.md` | Universal agent instructions — the entrypoint any agent reads first |
 | `install/manifest.yaml` | Machine-readable package metadata: name, version, install command, configuration directory, requires |
-| `install/install.yaml` | The install contract as data: five phases, what is written, what is NEVER touched |
+| `install/install.yaml` | The install contract as data: six stages, what is written, what is NEVER touched |
 | `install/AGENT.md` | The bootstrap protocol — the exact steps an external agent follows |
 | `install/instructions.md` | The human-facing install guide |
 | `templates/AGENTS.md` | The shape of the AGENTS.md written into a target repository (generator in the SDK; tests pin the shape) |
 
-## The five phases
+## The six stages
 
-`paw install` (the same code path as the npx entrypoint) runs:
+`paw init` (the same code path as the npx entrypoint) builds the workspace as five connected layers plus the runtime config that ties them together:
 
 ```
-inspect → understand → initialize → configure → verify
+resolve → acc → shield → proagents → reposell → paw
 ```
 
-| Phase | What happens |
-|-------|--------------|
-| inspect | Detects languages, runtime, package manager, frameworks, monorepo, coding agents (spec 148 conventions) |
-| understand | Infers project intent — product type, domains, skills — from `@README.md` + manifests; every inference names its source |
-| initialize | Creates `.paw/` metadata only when absent; existing configuration is preserved |
-| configure | Writes `AGENTS.md` agent notes when absent; reports the verification plan and the canonical lifecycle (section 151) |
-| verify | Reports the verification plan; executes checks only when the host asks (`paw install --verify`) |
+The order is the dependency graph, not a preference: profiles and the crew are derived from the ACC expertise map, the crew is wired to ACC context, and `.paw/` is written LAST because it is the only artifact that names the protection and distribution providers — writing it first would describe a system that does not exist yet.
+
+| Stage | What happens | Writes |
+|-------|--------------|--------|
+| resolve | Detects languages, runtime, package manager, frameworks, monorepo, coding agents (spec 148 conventions); decides where identity comes from — code AND README, else README, else code, else the questionnaire | — |
+| acc | Writes the knowledge layer — WHAT the repository knows — from DETECTED languages only (a false claim would send ACC looking for code that does not exist) | `.acc/config/config.yaml` |
+| shield | Writes the rules — what must never happen, refused BEFORE execution (section 35; `off` \| `audit` \| `warn` \| `guarded` \| `strict`, default `guarded`) | `.reposhield/policy.yaml` |
+| proagents | Writes WHO operates — one profile per profession the project needs, a crew wired to ACC context, and the environment config | `.proagents/profiles/`, `.proagents/crew/`, `.proagents/config.yaml` |
+| reposell | Writes the licensing + distribution posture — consumed, never re-implemented by the workspace (DISTRIBUTION.md) | `.reposell/distribution.yaml` |
+| paw | Creates `.paw/` metadata only when absent; writes `AGENTS.md` agent notes when absent; reports the verification plan and the canonical lifecycle (section 151); executes checks only when the host asks (`paw init --verify`) | `.paw/`, `AGENTS.md` |
 
 ## Starting from a file — the `@README.md` contract made literal
 
@@ -5271,7 +5276,7 @@ The prompt "Setup … for @README.md" implies that the workspace starts FROM the
 
 ```bash
 paw init README.md       # init, inferring intent from README.md
-paw install BRIEF.md     # five-phase install, driven by BRIEF.md
+paw init BRIEF.md        # six-stage install, driven by BRIEF.md (alias: paw install BRIEF.md)
 ```
 
 The inferred intent (product type, domains, skills, provenance) is persisted into the generated `.paw/workspace.yaml` as the `project:` block — informational data, never a gate, named sources, edit freely:
@@ -5295,17 +5300,18 @@ Every path ends in the same deterministic, idempotent machine — pick by contex
 
 | Context | Command | Source of intent |
 |---------|---------|------------------|
-| No CLI installed, agent-led (the canonical UX) | `npx @reposell/proagents-workspace@latest install` | `@README.md` + manifests (default) |
-| No CLI installed, specific file | `npx @reposell/proagents-workspace@latest install BRIEF.md` | that file + manifests |
-| `paw` already installed, specific file | `paw init README.md` or `paw install <file>` | that file + manifests |
+| No CLI installed, agent-led (the canonical UX) | `npx @reposell/proagents-workspace@latest init` | `@README.md` + manifests (default) |
+| No CLI installed, specific file | `npx @reposell/proagents-workspace@latest init BRIEF.md` | that file + manifests |
+| `paw` already installed, specific file | `paw init README.md` (alias: `paw install <file>`) | that file + manifests |
 | `paw` already installed, inference only | `paw init` | manifests + environment (no README prose) |
+| Empty repository (no code, no README) | `paw init` in a terminal asks five questions; headless: `paw init --answers "web app" "one sentence" "TypeScript" "open source" "guarded"` | the questionnaire (provenance: `questionnaire (n/5 answered)`) |
 | Re-initialize / inspect afterward | `paw status` | the effective picture (idempotent no-op re-runs) |
 
 The process for an agent, in order (full protocol in `install/AGENT.md`):
 
 1. Read the target's `README.md` and existing agent instructions (preserve them — never overwrite).
-2. Run the installer (`npx @reposell/proagents-workspace@latest install [file]`, or `paw init <file>` when installed) — the five phases: inspect → understand → initialize → configure → verify.
-3. Report the resulting configuration: the five-phase report, the persisted `project:` block, the verification plan, the lifecycle (`paw lifecycle show`).
+2. Run the installer (`npx @reposell/proagents-workspace@latest init [file]`, or `paw init <file>` when installed) — the six stages: resolve → acc → shield → proagents → reposell → paw.
+3. Report the resulting configuration: the six-stage report, the persisted `project:` block, the verification plan, the lifecycle (`paw lifecycle show`).
 
 The machine-readable statements of this process live in the `install/` folder of this repository — `install/manifest.yaml` (package metadata + install command), `install/install.yaml` (the contract as data: phases, writes, nevers), `install/AGENT.md` (the protocol an external agent follows), `install/instructions.md` (the human-facing guide). Documentation: [Agent Bootstrap](docs/bootstrap.md).
 
@@ -5314,22 +5320,33 @@ For the complete AI-agent contract — the full **install → set up → complet
 ## What an install never does
 
 - Modifies application code, rewrites `package.json`, or changes git state.
-- Overwrites an existing `AGENTS.md`, `CLAUDE.md`, `.cursorrules`, or `.paw/` configuration.
+- Overwrites an existing `AGENTS.md`, `CLAUDE.md`, `.cursorrules`, or any layer configuration (`.paw/`, `.acc/`, `.reposhield/`, `.proagents/`, `.reposell/`).
+- Writes into `.agents/` in a target repository (agent-owned namespace; section 146 hygiene).
 - Runs the project's tests uninvited.
 - Requires an account, a token, or network access beyond npx itself.
+- Claims the workspace is "ready" while the project intent is still unknown.
 
 ## The target repository afterwards
 
 ```
 repo/
-├── AGENTS.md              ← agent notes (only if none existed)
-└── .paw/                  ← runtime configuration
-    ├── workspace.yaml     ← minimal; everything else is inferred
+├── AGENTS.md                  ← agent notes (only if none existed)
+├── .acc/config/               ← ACC knowledge layer — WHAT the repository knows (ACC optional at runtime)
+├── .reposhield/
+│   └── policy.yaml            ← the rules — what must never happen, enforced before execution
+├── .proagents/                ← WHO operates
+│   ├── profiles/              ← one persona contract per needed profession
+│   ├── crew/                  ← crews wired to ACC context + the COMMENTS.md channel
+│   └── config.yaml            ← the agent environment
+├── .reposell/
+│   └── distribution.yaml      ← licensing + distribution (consumed, never re-implemented)
+└── .paw/                      ← runtime configuration — WHERE the agent works
+    ├── workspace.yaml         ← minimal; names the protection and distribution providers
     ├── sessions/
     └── artifacts/
 ```
 
-`.agents/` in the Workspace's own repository is the cross-agent comment channel; the Workspace never writes to `.agents/` in a target repository (section 146 hygiene: agent-owned files stay agent-owned). Inference is additive and honest: detection from manifests wins, the README fills what manifests cannot say, and every claim in the report names the file it came from.
+`.agents/` in the Workspace's own repository is the cross-agent comment channel; the Workspace never writes to `.agents/` in a target repository — the crew's coordination channel is written to `.proagents/crew/COMMENTS.md` instead (section 146 hygiene: agent-owned files stay agent-owned). Inference is additive and honest: detection from manifests wins, the README fills what manifests cannot say, and every claim in the report names the file it came from.
 
 # Self-diagnostics: paw check (section 153)
 
@@ -5376,6 +5393,6 @@ The three systems in this ecosystem each police their own domain — no cross-de
 
 ## Rules
 
-- `paw check` never mutates anything — it reports; `paw install`/`paw init` repair.
+- `paw check` never mutates anything — it reports; `paw init` (alias `paw install`) repair.
 - Framework checks run when the walked-up root declares `proagents.yaml`; workspace checks run when `.paw/` exists. The reported scope reflects what actually ran.
 - The release checklist (`.acc/config/workflows/release.md`) treats `paw check` as a pre-publish blocking step — the registry exists precisely to make release drift impossible to miss.

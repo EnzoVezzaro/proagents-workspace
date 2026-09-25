@@ -1,6 +1,6 @@
 {
   "name": "@proagents/plugin-git",
-  "version": "0.5.2",
+  "version": "0.5.3",
   "description": "Git repository capability provider for ProAgents Workspace — guarded clone/commit/push with conservative defaults.",
   "license": "MIT",
   "type": "module",

@@ -49,7 +49,24 @@ const PROTECTED_PATHS: readonly { pattern: RegExp; reason: string }[] = [
   { pattern: /(^|\/)paw-lock\.json$/, reason: "the lockfile is kernel-owned" },
 ];
 
-function evaluate(request: ProtectionRequest): ProtectionDecision {
+/**
+ * Enforcement posture (DISTRIBUTION.md section 7). The mode is DECLARED
+ * configuration, so it is honoured — a configured `off` that still blocks is
+ * a lie about the policy the operator wrote.
+ *
+ * `off`    — not enforced; nothing is recorded either.
+ * `audit`  — recorded (`protection/intervened`), never blocks.
+ * `warn`   — recorded and surfaced as a reason, never blocks.
+ * `guarded`/`strict` — a violating operation is refused. `guarded` is the
+ *            default; both refuse, and `strict` additionally refuses the
+ *            approval path for network egress.
+ */
+type EnforcementMode = "off" | "audit" | "warn" | "guarded" | "strict";
+
+function evaluate(request: ProtectionRequest, mode: EnforcementMode = "guarded"): ProtectionDecision {
+  if (mode === "off") {
+    return { action: "allow", reason: "protection is off (protection.mode: off)" };
+  }
   const op = request.operation.toLowerCase();
   const haystack = [
     request.target,
@@ -59,25 +76,42 @@ function evaluate(request: ProtectionRequest): ProtectionDecision {
     .map(normalize)
     .join(" ");
 
+  const refuse = (reason: string): ProtectionDecision => {
+    if (mode === "audit" || mode === "warn") {
+      return { action: "allow", reason: `${reason} (recorded only: protection.mode: ${mode})` };
+    }
+    return { action: "block", reason: `blocked: ${reason} (spec section 35)` };
+  };
+
   for (const rule of DESTRUCTIVE_COMMAND_PATTERNS) {
     if (rule.pattern.test(haystack)) {
-      return {
-        action: "block",
-        reason: `blocked: ${rule.reason} (spec section 35)`,
-      };
+      return refuse(rule.reason);
     }
   }
   if (op.startsWith("filesystem")) {
     for (const rule of PROTECTED_PATHS) {
       if (rule.pattern.test(normalize(request.target))) {
-        return { action: "block", reason: `blocked: ${rule.reason}` };
+        return refuse(rule.reason);
       }
     }
   }
   if (op.startsWith("network")) {
+    if (mode === "strict") {
+      return { action: "block", reason: "blocked: network egress is disabled (protection.mode: strict)" };
+    }
+    if (mode === "audit" || mode === "warn") {
+      return { action: "allow", reason: `network egress (recorded only: protection.mode: ${mode})` };
+    }
     return { action: "requires-approval", reason: "network egress requires explicit approval (least privilege)" };
   }
   return { action: "allow", reason: "no protection rule matched" };
+}
+
+/** Read the declared enforcement posture, defaulting to the safe `guarded`. */
+function enforcementMode(configured: unknown): EnforcementMode {
+  return configured === "off" || configured === "audit" || configured === "warn" || configured === "strict"
+    ? configured
+    : "guarded";
 }
 
 export const repoShieldPlugin = definePlugin({
@@ -93,50 +127,73 @@ export const repoShieldPlugin = definePlugin({
     compatibility: { workspaceApi: "^1.0.0", protectionContract: "^1.0.0" },
   },
   activate(ctx) {
+    // The declared posture is read ONCE at activation: enforcement strength
+    // is a policy fact, not a per-call dial.
+    const mode = enforcementMode(ctx.config["protection"]?.["mode"]);
+    const decide = (request: ProtectionRequest): ProtectionDecision => evaluate(request, mode);
+
     const provider: ProtectionProvider = {
       name: "repo-shield",
       contractVersion: "1.0.0",
       health: async (): Promise<ProviderHealth> => {
-        const probe = evaluate({ operation: "protection.evaluate", target: "git push --force" });
+        if (mode === "off") {
+          return { status: "degraded", message: "protection is disabled (protection.mode: off) — nothing is enforced" };
+        }
+        // The self-test must be evaluated under the posture that will
+        // actually be enforced, or health would claim a strict guarantee
+        // the configuration just turned off.
+        const probe = decide({ operation: "protection.evaluate", target: "git push --force" });
         return probe.action === "block"
-          ? { status: "healthy", message: "protection rules loaded (self-test passed)" }
-        : { status: "degraded", message: "self-test failed: destructive command was not blocked" };
+          ? { status: "healthy", message: `protection rules loaded (self-test passed, mode: ${mode})` }
+          : { status: "degraded", message: `self-test failed under protection.mode: ${mode}` };
       },
-      evaluate: async (request: ProtectionRequest): Promise<ProtectionDecision> => evaluate(request),
+      evaluate: async (request: ProtectionRequest): Promise<ProtectionDecision> => decide(request),
     };
 
     ctx.services.register(repoShieldDefinition, provider, "repo-shield");
 
     // Before-execution veto chain: the kernel event bus awaits subscribers,
     // so throwing here blocks the operation BEFORE it runs (spec 101–102).
+    // In `audit`/`warn` the decision is recorded and execution continues —
+    // the reason travels on `protection/intervened` either way.
     ctx.events.on("command/before", async (payload) => {
-      const decision = evaluate({
+      const decision = decide({ operation: "command", target: payload.command });
+      if (decision.action !== "block") {
+        if (mode === "audit" || mode === "warn") {
+          await ctx.events.emit("protection/intervened", {
+            operation: "command",
+            target: payload.command,
+            action: "recorded",
+          });
+        }
+        return;
+      }
+      await ctx.events.emit("protection/intervened", {
         operation: "command",
         target: payload.command,
+        action: "blocked",
       });
-      if (decision.action === "block") {
-        await ctx.events.emit("protection/intervened", {
-          operation: "command",
-          target: payload.command,
-          action: "blocked",
-        });
-        throw vetoError(decision.reason);
-      }
+      throw vetoError(decision.reason);
     });
 
     ctx.events.on("filesystem/before-write", async (payload) => {
-      const decision = evaluate({
+      const decision = decide({ operation: "filesystem.write", target: payload.path });
+      if (decision.action !== "block") {
+        if (mode === "audit" || mode === "warn") {
+          await ctx.events.emit("protection/intervened", {
+            operation: "filesystem.write",
+            target: payload.path,
+            action: "recorded",
+          });
+        }
+        return;
+      }
+      await ctx.events.emit("protection/intervened", {
         operation: "filesystem.write",
         target: payload.path,
+        action: "blocked",
       });
-      if (decision.action === "block") {
-        await ctx.events.emit("protection/intervened", {
-          operation: "filesystem.write",
-          target: payload.path,
-          action: "blocked",
-        });
-        throw vetoError(decision.reason);
-      }
+      throw vetoError(decision.reason);
     });
   },
 });

@@ -4,6 +4,8 @@ export * from "./conventions.js";
 export * from "./simple-yaml.js";
 export * from "./research.js";
 export * from "./install.js";
+export * from "./stages.js";
+export * from "./questionnaire.js";
 export * from "./check.js";
 
 // Re-export the full contract + kernel surface so plugin authors depend on

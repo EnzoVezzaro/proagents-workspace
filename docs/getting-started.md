@@ -29,34 +29,39 @@ That is the product. Everything else is progressive.
 paw init
 ```
 
-Run inside an existing repository. The command:
+Run inside an existing repository. `init` is the workspace BOOTSTRAPPER
+(spec section 152) — it runs six stages, one per layer:
 
-1. Detects the repository and project (languages, package manager, frameworks)
-2. Detects available coding agents (Codex, Claude Code, OpenCode, Gemini CLI, DeepSeek Harness, …)
-3. Creates minimal Workspace metadata (`.paw/` only)
-4. Detects existing development commands and configures verification
-5. Leaves your source code untouched
+1. **resolve** — detects the repository and project (languages, package manager, frameworks), the available coding agents (Codex, Claude Code, OpenCode, Gemini CLI, …), and decides where identity comes from: code AND README, else README, else code, else the questionnaire
+2. **acc** — writes the ACC knowledge layer (`.acc/config/config.yaml`) from detected languages only
+3. **shield** — writes the Repo Shield policy (`.reposhield/policy.yaml`): destructive git operations are refused before execution
+4. **proagents** — writes WHO operates: profiles (`.proagents/profiles/`), a crew wired to ACC context (`.proagents/crew/`), the environment config (`.proagents/config.yaml`)
+5. **reposell** — writes the distribution posture (`.reposell/distribution.yaml`)
+6. **paw** — creates `.paw/` LAST (the config that ties the layers together) plus `AGENTS.md` when absent; reports verification and the lifecycle
+
+An empty repository (no code, no README) gets the five-question interview: `paw init` asks it in a terminal, or pass `paw init --answers "web app" "one sentence" "TypeScript" "open source" "guarded"` headlessly. (`paw install` is an alias of `paw init`.)
 
 Example output:
 
 ```text
-✓ TypeScript project — pnpm
-✓ Codex CLI — tier: process
-✓ Claude Code — tier: process
+✓ resolve
+    basis: code + README — typescript, pnpm
+✓ acc
+    + .acc/config/config.yaml
+✓ shield
+    + .reposhield/policy.yaml
+✓ proagents
+    + .proagents/config.yaml
+    ...
+✓ reposell
+    + .reposell/distribution.yaml
+✓ paw
+    + .paw/workspace.yaml
 
-ProAgents Workspace initialized.
-
-Created:
-  .paw/workspace.yaml
-  .paw/sessions
-  .paw/artifacts
-  AGENTS.md          (only when absent — never overwritten)
-
-No runtime required.
-No cloud account required.
+Workspace ready.
 ```
 
-`paw init` never overwrites project files, never rewrites `package.json`, and never changes Git state. Existing `AGENTS.md` and `.acc/` files stay owned by their existing owners.
+`paw init` never overwrites project files, never rewrites `package.json`, and never changes Git state. Existing `AGENTS.md`, `.acc/`, `.reposhield/`, `.proagents/`, and `.reposell/` files stay owned by their existing owners.
 
 ## Status and Doctor
 

@@ -1,6 +1,6 @@
 {
   "name": "@proagents/workspace",
-  "version": "0.5.2",
+  "version": "0.5.3",
   "description": "ProAgents Workspace SDK: contracts, kernel client API, and the definePlugin helper. The package plugins depend on.",
   "license": "MIT",
   "type": "module",

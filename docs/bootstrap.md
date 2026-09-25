@@ -12,22 +12,28 @@ Setup https://github.com/EnzoVezzaro/proagents-workspace for @README.md (project
 The agent reads the bootstrap protocol ([`install/AGENT.md`](https://github.com/EnzoVezzaro/proagents-workspace/blob/main/install/AGENT.md)) and runs:
 
 ```bash
-npx @reposell/proagents-workspace@latest install
+npx @reposell/proagents-workspace@latest init
 ```
 
-## The five phases
+(`install` is a stable alias for the same machine.)
+
+## The six stages
 
 ```text
-inspect  →  understand  →  initialize  →  configure  →  verify
+resolve  →  acc  →  shield  →  proagents  →  reposell  →  paw
 ```
 
-| Phase | What happens |
+| Stage | What happens |
 |-------|--------------|
-| inspect | Detects languages, runtime, package manager, frameworks, monorepo, coding agents |
-| understand | Infers project intent (product type, domains, skills) from `README.md` + manifests — every inference names its source |
-| initialize | Creates `.paw/` metadata when absent; existing configuration is preserved |
-| configure | Writes `AGENTS.md` agent notes when absent; reports the verification plan and lifecycle |
-| verify | Reports the verification plan; executes only with `paw install --verify` |
+| resolve | Detects languages, runtime, package manager, frameworks, monorepo, coding agents; decides where identity comes from — code AND README, else README, else code, else the questionnaire |
+| acc | Writes the ACC knowledge layer (`.acc/config/config.yaml`) from detected languages only — every inference names its source |
+| shield | Writes the Repo Shield policy (`.reposhield/policy.yaml`): what must never happen, refused before execution |
+| proagents | Writes WHO operates: profiles (`.proagents/profiles/`), a crew wired to ACC context (`.proagents/crew/`), the environment config (`.proagents/config.yaml`) |
+| reposell | Writes the distribution posture (`.reposell/distribution.yaml`) — consumed, never re-implemented by the workspace |
+| paw | Creates `.paw/` LAST — the config that names the protection and distribution providers — plus `AGENTS.md` when absent; reports verification and lifecycle |
+
+`.paw/` is written last on purpose: the config names the layers it configures,
+so writing it first would reference files that do not exist yet.
 
 ## Starting from a file
 
@@ -35,20 +41,43 @@ The `@README.md` in the prompt is a semantic contract — the workspace starts f
 
 ```bash
 paw init README.md       # init with intent inferred from README.md
-paw install BRIEF.md     # install driven by BRIEF.md
+paw init BRIEF.md        # init driven by BRIEF.md (alias: paw install BRIEF.md)
 ```
 
 The inferred intent is persisted as a `project:` block in the generated
 `.paw/workspace.yaml` — informational, named sources, edit freely. An
 unreadable source file is a structured `INTENT_SOURCE_UNREADABLE` error.
 
+## The questionnaire — empty repositories
+
+When a repository cannot describe itself (no code, no README), the installer
+does not guess. It asks five questions:
+
+1. What is this project? (web app / CLI tool / API / library / desktop app / …)
+2. What does it do, in one sentence?
+3. Which technologies/languages do you plan to use?
+4. How will it be distributed? (drives the reposell layer)
+5. How strict should protection be? (drives the shield layer; default `guarded`)
+
+Interactive (a terminal): `paw init` asks them inline and applies the intent
+immediately. Headless (agents, CI): the report prints the exact command:
+
+```bash
+paw init --answers "web app" "a task manager" "TypeScript" "open source" "guarded"
+```
+
+Until the interview is answered, the layers are scaffolded but no `project:`
+block is written — a scaffolded workspace is reported as such, never as
+"ready".
+
 ## Guarantees
 
 - **Metadata-only** — application code, `package.json`, and git state are never touched (spec section 44).
-- **Preserving** — an existing `AGENTS.md` or `.paw/workspace.yaml` is never overwritten.
+- **Preserving** — existing `AGENTS.md`, `.paw/`, `.acc/`, `.reposhield/`, `.proagents/`, and `.reposell/` files are never overwritten.
 - **Idempotent** — running twice changes nothing the second time.
-- **Honest** — a README-less, manifest-less directory still installs; inference reports `derived from: no manifests or README` rather than inventing facts.
+- **Honest** — an indescribable repository gets the questionnaire, not a guess; nothing claims "ready" while the project intent is unknown.
 - **Accountless** — no token, no sign-up; network use is npx itself.
+- **Agent-namespace-clean** — the installer never writes into `.agents/` (agent-owned).
 
 ## The contract files
 
@@ -58,24 +87,3 @@ unreadable source file is a structured `INTENT_SOURCE_UNREADABLE` error.
 | `install/install.yaml` | The install contract as data — the unit tests are its executable form |
 | `install/AGENT.md` | The bootstrap protocol for external agents |
 | `install/instructions.md` | The human-facing install guide |
-| `templates/AGENTS.md` | The shape of the generated target `AGENTS.md` |
-
-## After the install
-
-The agent reports the resulting configuration (the install report, the
-verification plan, the lifecycle). The human then works normally:
-
-```bash
-paw status            # the workspace picture
-paw verify            # run the verification checks
-paw lifecycle show    # the phases this workspace runs
-```
-
-See [Configuration](configuration.md) for what lives in
-`.paw/workspace.yaml`, and [Lifecycle](lifecycle.md) for the canonical
-phase flow the install sets up. For the complete AI-agent install, setup,
-and completion contract — including the long-run playbook, verification
-gates, failure handling, and the final report — use the [PAW Installation
-Runbook](paw-install-runbook.md). To install the separate ProAgents
-professional profiles or a profile-backed crew, follow the ProAgents
-project's own guidance.

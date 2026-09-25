@@ -11,6 +11,9 @@ export const ErrorCode = {
   PROJECT_NOT_INITIALIZED: "PROJECT_NOT_INITIALIZED",
   // file-driven init/install (spec sections 148/152)
   INTENT_SOURCE_UNREADABLE: "INTENT_SOURCE_UNREADABLE",
+  // the questionnaire path (spec section 152): answers were required but none
+  // usable were provided
+  QUESTIONNAIRE_EMPTY: "QUESTIONNAIRE_EMPTY",
   // checkpoints + gates (spec section 150): attempt ≠ completion
   CHECKPOINT_NOT_FOUND: "CHECKPOINT_NOT_FOUND",
   CHECKPOINT_BLOCKED: "CHECKPOINT_BLOCKED",
